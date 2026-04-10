@@ -1,5 +1,5 @@
-import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useDirty } from '../context/DirtyContext';
 
 const headerStyle = {
   display: 'flex',
@@ -67,6 +67,7 @@ const toggleBtnStyle = (active) => ({
 
 export default function Header({ user, isProfessor, signOut, viewMode, setViewMode }) {
   const navigate = useNavigate();
+  const { guardedNavigate } = useDirty();
 
   const handleSignOut = async () => {
     await signOut();
@@ -85,16 +86,13 @@ export default function Header({ user, isProfessor, signOut, viewMode, setViewMo
           <div style={toggleContainerStyle}>
             <button
               style={toggleBtnStyle(viewMode === 'student')}
-              onClick={() => { setViewMode('student'); navigate('/'); }}
+              onClick={() => guardedNavigate(() => { setViewMode('student'); navigate('/'); })}
             >
               Student View
             </button>
             <button
               style={toggleBtnStyle(viewMode === 'instructor')}
-              onClick={() => {
-                setViewMode('instructor');
-                navigate('/instructor');
-              }}
+              onClick={() => guardedNavigate(() => { setViewMode('instructor'); navigate('/instructor'); })}
             >
               Instructor View
             </button>

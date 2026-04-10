@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useDirty } from '../context/DirtyContext';
 import { useNavigate } from 'react-router-dom';
 import {
   collection,
@@ -45,6 +46,12 @@ function InlinePromptEditor({ docPath, initialData, userEmail, label }) {
   const [updatedBy, setUpdatedBy] = useState(initialData?.updatedBy || '');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const { setDirty } = useDirty();
+
+  // Always-fresh ref so the dirty-modal Save can read current content
+  const contentRef = useRef(content);
+
+  useEffect(() => () => setDirty(false), [setDirty]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -54,13 +61,14 @@ function InlinePromptEditor({ docPath, initialData, userEmail, label }) {
       const newVersion = version + 1;
       const now = serverTimestamp();
       await updateDoc(ref, {
-        content,
+        content: contentRef.current,
         version: newVersion,
         updatedAt: now,
         updatedBy: userEmail,
       });
       setVersion(newVersion);
       setUpdatedBy(userEmail);
+      setDirty(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (err) {
@@ -68,6 +76,13 @@ function InlinePromptEditor({ docPath, initialData, userEmail, label }) {
       alert('Save failed: ' + err.message);
     }
     setSaving(false);
+  };
+
+  const handleChange = (e) => {
+    const val = e.target.value;
+    setContent(val);
+    contentRef.current = val;
+    setDirty(true, handleSave);
   };
 
   return (
@@ -83,7 +98,7 @@ function InlinePromptEditor({ docPath, initialData, userEmail, label }) {
       <textarea
         className="prompt-textarea"
         value={content}
-        onChange={(e) => setContent(e.target.value)}
+        onChange={handleChange}
         placeholder={`Enter ${label || 'prompt'} content...`}
       />
       <div className="prompt-actions">
@@ -105,20 +120,28 @@ function DocEditor({ doc: docData, assignmentId, userEmail, onSaved }) {
   const [includeInPrompt, setIncludeInPrompt] = useState(docData.includeInPrompt || false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const { setDirty } = useDirty();
+
+  // Ref so handleSave always reads the latest field values (avoids stale closures)
+  const fieldsRef = useRef({ title, content, type, includeInPrompt });
+
+  useEffect(() => () => setDirty(false), [setDirty]);
 
   const handleSave = async () => {
     setSaving(true);
     try {
+      const { title: t, content: c, type: ty, includeInPrompt: ip } = fieldsRef.current;
       const ref = doc(db, 'prompts', 'd4-assignments', assignmentId, 'docs', docData.id);
       await updateDoc(ref, {
-        title,
-        content,
-        type,
-        includeInPrompt,
+        title: t,
+        content: c,
+        type: ty,
+        includeInPrompt: ip,
         version: (docData.version || 0) + 1,
         updatedAt: serverTimestamp(),
         updatedBy: userEmail,
       });
+      setDirty(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
       if (onSaved) onSaved();
@@ -126,6 +149,13 @@ function DocEditor({ doc: docData, assignmentId, userEmail, onSaved }) {
       alert('Save failed: ' + err.message);
     }
     setSaving(false);
+  };
+
+  const markDirty = () => setDirty(true, handleSave);
+
+  const setField = (field, value) => {
+    fieldsRef.current = { ...fieldsRef.current, [field]: value };
+    markDirty();
   };
 
   return (
@@ -141,7 +171,11 @@ function DocEditor({ doc: docData, assignmentId, userEmail, onSaved }) {
             <input
               type="checkbox"
               checked={includeInPrompt}
-              onChange={(e) => setIncludeInPrompt(e.target.checked)}
+              onChange={(e) => {
+                const v = e.target.checked;
+                setIncludeInPrompt(v);
+                setField('includeInPrompt', v);
+              }}
             />
             Include in prompt
           </label>
@@ -156,7 +190,7 @@ function DocEditor({ doc: docData, assignmentId, userEmail, onSaved }) {
             <input
               className="form-input"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => { setTitle(e.target.value); setField('title', e.target.value); }}
             />
           </div>
           <div className="form-group">
@@ -164,7 +198,7 @@ function DocEditor({ doc: docData, assignmentId, userEmail, onSaved }) {
             <select
               className="form-select"
               value={type}
-              onChange={(e) => setType(e.target.value)}
+              onChange={(e) => { setType(e.target.value); setField('type', e.target.value); }}
             >
               <option value="markdown">Markdown</option>
               <option value="plaintext">Plaintext</option>
@@ -176,7 +210,7 @@ function DocEditor({ doc: docData, assignmentId, userEmail, onSaved }) {
               className="prompt-textarea"
               style={{ minHeight: '160px' }}
               value={content}
-              onChange={(e) => setContent(e.target.value)}
+              onChange={(e) => { setContent(e.target.value); setField('content', e.target.value); }}
             />
           </div>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -199,6 +233,13 @@ function AssignmentEditor({ assignmentId, userEmail, onBack }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [form, setForm] = useState({});
+  const { setDirty, guardedNavigate } = useDirty();
+
+  // Always-fresh ref so the dirty-modal Save reads current form state
+  const formRef = useRef(form);
+  const dataRef = useRef(data);
+
+  useEffect(() => () => setDirty(false), [setDirty]);
 
   useEffect(() => {
     load();
@@ -212,7 +253,9 @@ function AssignmentEditor({ assignmentId, userEmail, onBack }) {
       if (snap.exists()) {
         const d = snap.data();
         setData(d);
+        dataRef.current = d;
         setForm(d);
+        formRef.current = d;
       }
       const docsSnap = await getDocs(
         query(
@@ -230,16 +273,19 @@ function AssignmentEditor({ assignmentId, userEmail, onBack }) {
   const handleSave = async () => {
     setSaving(true);
     try {
+      const currentForm = formRef.current;
+      const currentData = dataRef.current;
       const ref = doc(db, 'prompts', 'd4-assignments', assignmentId);
       await updateDoc(ref, {
-        ...form,
-        version: (data?.version || 0) + 1,
+        ...currentForm,
+        version: (currentData?.version || 0) + 1,
         updatedAt: serverTimestamp(),
         updatedBy: userEmail,
-        active: form.active === true || form.active === 'true',
-        order: parseInt(form.order) || 0,
-        estimatedMinutes: parseInt(form.estimatedMinutes) || 0,
+        active: currentForm.active === true || currentForm.active === 'true',
+        order: parseInt(currentForm.order) || 0,
+        estimatedMinutes: parseInt(currentForm.estimatedMinutes) || 0,
       });
+      setDirty(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
@@ -268,15 +314,25 @@ function AssignmentEditor({ assignmentId, userEmail, onBack }) {
     }
   };
 
-  const f = (field) => (e) => setForm({ ...form, [field]: e.target.value });
-  const fb = (field) => (e) => setForm({ ...form, [field]: e.target.checked });
+  const f = (field) => (e) => {
+    const updated = { ...formRef.current, [field]: e.target.value };
+    formRef.current = updated;
+    setForm(updated);
+    setDirty(true, handleSave);
+  };
+  const fb = (field) => (e) => {
+    const updated = { ...formRef.current, [field]: e.target.checked };
+    formRef.current = updated;
+    setForm(updated);
+    setDirty(true, handleSave);
+  };
 
   if (loading) return <div className="loading-center"><div className="spinner" /></div>;
 
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-        <button className="back-btn" onClick={onBack}>← Back</button>
+        <button className="back-btn" onClick={() => guardedNavigate(onBack)}>← Back</button>
         <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)' }}>
           {data?.title || assignmentId}
         </h2>
@@ -515,6 +571,16 @@ function CaseStudyEditor({ caseStudyId, userEmail, onBack }) {
   const [concepts, setConcepts] = useState([]);
   const [sources, setSources] = useState([]);
   const [quickPrompts, setQuickPrompts] = useState([]);
+  const { setDirty, guardedNavigate } = useDirty();
+
+  // Always-fresh refs so dirty-modal Save reads current state
+  const formRef = useRef(form);
+  const dataRef = useRef(data);
+  const conceptsRef = useRef([]);
+  const sourcesRef = useRef([]);
+  const quickPromptsRef = useRef([]);
+
+  useEffect(() => () => setDirty(false), [setDirty]);
 
   useEffect(() => { load(); }, [caseStudyId]);
 
@@ -525,11 +591,11 @@ function CaseStudyEditor({ caseStudyId, userEmail, onBack }) {
       const snap = await getDoc(ref);
       if (snap.exists()) {
         const d = snap.data();
-        setData(d);
-        setForm(d);
-        setConcepts(d.concepts || []);
-        setSources(d.primarySources || []);
-        setQuickPrompts(d.quickPrompts || []);
+        setData(d); dataRef.current = d;
+        setForm(d); formRef.current = d;
+        const c = d.concepts || []; setConcepts(c); conceptsRef.current = c;
+        const s = d.primarySources || []; setSources(s); sourcesRef.current = s;
+        const q = d.quickPrompts || []; setQuickPrompts(q); quickPromptsRef.current = q;
       }
     } catch (err) { console.error(err); }
     setLoading(false);
@@ -539,33 +605,50 @@ function CaseStudyEditor({ caseStudyId, userEmail, onBack }) {
     setSaving(true);
     try {
       const ref = doc(db, 'prompts', 'casestudies', caseStudyId);
+      const currentForm = formRef.current;
       await updateDoc(ref, {
-        ...form,
-        concepts,
-        primarySources: sources,
-        quickPrompts,
-        version: (data?.version || 0) + 1,
+        ...currentForm,
+        concepts: conceptsRef.current,
+        primarySources: sourcesRef.current,
+        quickPrompts: quickPromptsRef.current,
+        version: (dataRef.current?.version || 0) + 1,
         updatedAt: serverTimestamp(),
         updatedBy: userEmail,
-        active: form.active === true || form.active === 'true',
-        order: parseInt(form.order) || 0,
-        estimatedMinutes: parseInt(form.estimatedMinutes) || 0,
+        active: currentForm.active === true || currentForm.active === 'true',
+        order: parseInt(currentForm.order) || 0,
+        estimatedMinutes: parseInt(currentForm.estimatedMinutes) || 0,
       });
+      setDirty(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (err) { alert('Save failed: ' + err.message); }
     setSaving(false);
   };
 
-  const f = (field) => (e) => setForm({ ...form, [field]: e.target.value });
-  const fb = (field) => (e) => setForm({ ...form, [field]: e.target.checked });
+  const f = (field) => (e) => {
+    const updated = { ...formRef.current, [field]: e.target.value };
+    formRef.current = updated;
+    setForm(updated);
+    setDirty(true, handleSave);
+  };
+  const fb = (field) => (e) => {
+    const updated = { ...formRef.current, [field]: e.target.checked };
+    formRef.current = updated;
+    setForm(updated);
+    setDirty(true, handleSave);
+  };
+
+  // Wrappers for array state so refs stay in sync
+  const updateConcepts = (val) => { conceptsRef.current = val; setConcepts(val); setDirty(true, handleSave); };
+  const updateSources = (val) => { sourcesRef.current = val; setSources(val); setDirty(true, handleSave); };
+  const updateQuickPrompts = (val) => { quickPromptsRef.current = val; setQuickPrompts(val); setDirty(true, handleSave); };
 
   if (loading) return <div className="loading-center"><div className="spinner" /></div>;
 
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-        <button className="back-btn" onClick={onBack}>← Back</button>
+        <button className="back-btn" onClick={() => guardedNavigate(onBack)}>← Back</button>
         <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)' }}>
           {data?.title || caseStudyId}
         </h2>
@@ -626,9 +709,8 @@ function CaseStudyEditor({ caseStudyId, userEmail, onBack }) {
                   placeholder="ID (e.g. wrong-abstraction)"
                   value={c.id}
                   onChange={(e) => {
-                    const updated = [...concepts];
-                    updated[i] = { ...c, id: e.target.value };
-                    setConcepts(updated);
+                    const updated = [...concepts]; updated[i] = { ...c, id: e.target.value };
+                    updateConcepts(updated);
                   }}
                   style={{ flex: '0 0 160px' }}
                 />
@@ -636,16 +718,15 @@ function CaseStudyEditor({ caseStudyId, userEmail, onBack }) {
                   placeholder="Label (e.g. Wrong Abstraction)"
                   value={c.label}
                   onChange={(e) => {
-                    const updated = [...concepts];
-                    updated[i] = { ...c, label: e.target.value };
-                    setConcepts(updated);
+                    const updated = [...concepts]; updated[i] = { ...c, label: e.target.value };
+                    updateConcepts(updated);
                   }}
                 />
-                <button className="remove-btn" onClick={() => setConcepts(concepts.filter((_, j) => j !== i))}>×</button>
+                <button className="remove-btn" onClick={() => updateConcepts(concepts.filter((_, j) => j !== i))}>×</button>
               </div>
             ))}
           </div>
-          <button className="add-item-btn" onClick={() => setConcepts([...concepts, { id: '', label: '' }])}>
+          <button className="add-item-btn" onClick={() => updateConcepts([...concepts, { id: '', label: '' }])}>
             + Add Concept
           </button>
         </div>
@@ -663,27 +744,27 @@ function CaseStudyEditor({ caseStudyId, userEmail, onBack }) {
                     className="form-input"
                     placeholder="Label"
                     value={s.label}
-                    onChange={(e) => { const u = [...sources]; u[i] = { ...s, label: e.target.value }; setSources(u); }}
+                    onChange={(e) => { const u = [...sources]; u[i] = { ...s, label: e.target.value }; updateSources(u); }}
                     style={{ flex: 1 }}
                   />
-                  <button className="remove-btn" onClick={() => setSources(sources.filter((_, j) => j !== i))}>×</button>
+                  <button className="remove-btn" onClick={() => updateSources(sources.filter((_, j) => j !== i))}>×</button>
                 </div>
                 <input
                   className="form-input"
                   placeholder="URL"
                   value={s.url}
-                  onChange={(e) => { const u = [...sources]; u[i] = { ...s, url: e.target.value }; setSources(u); }}
+                  onChange={(e) => { const u = [...sources]; u[i] = { ...s, url: e.target.value }; updateSources(u); }}
                 />
                 <input
                   className="form-input"
                   placeholder="Description"
                   value={s.description || ''}
-                  onChange={(e) => { const u = [...sources]; u[i] = { ...s, description: e.target.value }; setSources(u); }}
+                  onChange={(e) => { const u = [...sources]; u[i] = { ...s, description: e.target.value }; updateSources(u); }}
                 />
               </div>
             ))}
           </div>
-          <button className="add-item-btn" onClick={() => setSources([...sources, { label: '', url: '', description: '' }])}>
+          <button className="add-item-btn" onClick={() => updateSources([...sources, { label: '', url: '', description: '' }])}>
             + Add Source
           </button>
         </div>
@@ -699,13 +780,13 @@ function CaseStudyEditor({ caseStudyId, userEmail, onBack }) {
                 <input
                   placeholder="Quick prompt text..."
                   value={qp}
-                  onChange={(e) => { const u = [...quickPrompts]; u[i] = e.target.value; setQuickPrompts(u); }}
+                  onChange={(e) => { const u = [...quickPrompts]; u[i] = e.target.value; updateQuickPrompts(u); }}
                 />
-                <button className="remove-btn" onClick={() => setQuickPrompts(quickPrompts.filter((_, j) => j !== i))}>×</button>
+                <button className="remove-btn" onClick={() => updateQuickPrompts(quickPrompts.filter((_, j) => j !== i))}>×</button>
               </div>
             ))}
           </div>
-          <button className="add-item-btn" onClick={() => setQuickPrompts([...quickPrompts, ''])}>
+          <button className="add-item-btn" onClick={() => updateQuickPrompts([...quickPrompts, ''])}>
             + Add Quick Prompt
           </button>
         </div>
@@ -1105,6 +1186,7 @@ function TranscriptView({ data, onBack }) {
 // ─── System Prompts View ──────────────────────────────────────────────────────
 function SystemPromptsView({ userEmail }) {
   const [subTab, setSubTab] = useState('d4base');
+  const { guardedNavigate } = useDirty();
   const [d4Base, setD4Base] = useState(null);
   const [assignments, setAssignments] = useState([]);
   const [caseStudies, setCaseStudies] = useState([]);
@@ -1180,9 +1262,9 @@ function SystemPromptsView({ userEmail }) {
       </div>
 
       <div className="subnav-tabs">
-        <button className={`subnav-tab${subTab === 'd4base' ? ' active' : ''}`} onClick={() => setSubTab('d4base')}>D4 Base</button>
-        <button className={`subnav-tab${subTab === 'd4assignments' ? ' active' : ''}`} onClick={() => setSubTab('d4assignments')}>D4 Assignments</button>
-        <button className={`subnav-tab${subTab === 'casestudies' ? ' active' : ''}`} onClick={() => setSubTab('casestudies')}>Case Studies</button>
+        <button className={`subnav-tab${subTab === 'd4base' ? ' active' : ''}`} onClick={() => guardedNavigate(() => setSubTab('d4base'))}>D4 Base</button>
+        <button className={`subnav-tab${subTab === 'd4assignments' ? ' active' : ''}`} onClick={() => guardedNavigate(() => setSubTab('d4assignments'))}>D4 Assignments</button>
+        <button className={`subnav-tab${subTab === 'casestudies' ? ' active' : ''}`} onClick={() => guardedNavigate(() => setSubTab('casestudies'))}>Case Studies</button>
       </div>
 
       {subTab === 'd4base' && (
@@ -1265,6 +1347,7 @@ function SystemPromptsView({ userEmail }) {
 export default function InstructorDashboard({ user, isProfessor, signOut, permissions, viewMode, setViewMode }) {
   const navigate = useNavigate();
   const [navTab, setNavTab] = useState('students');
+  const { guardedNavigate } = useDirty();
 
   useEffect(() => {
     if (!isProfessor) {
@@ -1289,13 +1372,13 @@ export default function InstructorDashboard({ user, isProfessor, signOut, permis
           <div className="dashboard-nav-title">Instructor</div>
           <button
             className={`dashboard-nav-item${navTab === 'students' ? ' active' : ''}`}
-            onClick={() => setNavTab('students')}
+            onClick={() => guardedNavigate(() => setNavTab('students'))}
           >
             Students
           </button>
           <button
             className={`dashboard-nav-item${navTab === 'prompts' ? ' active' : ''}`}
-            onClick={() => setNavTab('prompts')}
+            onClick={() => guardedNavigate(() => setNavTab('prompts'))}
           >
             System Prompts
           </button>

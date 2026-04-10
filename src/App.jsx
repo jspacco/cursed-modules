@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
+import { DirtyProvider } from './context/DirtyContext';
 import Landing from './pages/Landing';
 import CaseStudy from './pages/CaseStudy';
 import Assignment from './pages/Assignment';
@@ -14,6 +15,7 @@ export default function App() {
   const sharedProps = { user, isProfessor, signOut, permissions, viewMode, setViewMode };
 
   return (
+    <DirtyProvider>
     <BrowserRouter>
       <Routes>
         <Route
@@ -53,5 +55,6 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
+    </DirtyProvider>
   );
 }
