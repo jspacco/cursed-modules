@@ -85,7 +85,7 @@ export default function Header({ user, isProfessor, signOut, viewMode, setViewMo
           <div style={toggleContainerStyle}>
             <button
               style={toggleBtnStyle(viewMode === 'student')}
-              onClick={() => setViewMode('student')}
+              onClick={() => { setViewMode('student'); navigate('/'); }}
             >
               Student View
             </button>
