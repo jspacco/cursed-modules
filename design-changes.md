@@ -5,6 +5,29 @@ Merge these into `design.md` if rebuilding the app from scratch.
 
 ---
 
+## 2026-04-10 — Fix: Use setDoc({ merge: true }) for all instructor dashboard saves
+
+**File:** `src/pages/InstructorDashboard.jsx`
+
+**Problem:** All four save operations used `updateDoc()`, which throws if the target document does not yet exist. This broke saving the D4 base system prompt on a fresh Firebase project where that document had never been written, and would similarly fail for any assignment, case study, or supporting doc that was created outside the normal "new item" flow.
+
+**Fix:** Replaced all four `updateDoc()` calls with `setDoc(..., { merge: true })`. This creates the document if it does not exist and merges fields if it does, while preserving any fields not included in the write. The `updateDoc` import was removed from the Firestore imports.
+
+**Calls changed:**
+
+| Component | Document path |
+|---|---|
+| `InlinePromptEditor` | `/prompts/d4-base` (and any other prompt doc path) |
+| `DocEditor` | `/prompts/d4-assignments/{id}/docs/{docId}` |
+| `AssignmentEditor` | `/prompts/d4-assignments/{id}` |
+| `CaseStudyEditor` | `/prompts/casestudies/{id}` |
+
+**Design.md addition** (under `## INSTRUCTOR DASHBOARD → System Prompts`):
+
+> All save operations use `setDoc(ref, data, { merge: true })` rather than `updateDoc()`. This ensures saves succeed even when the target document does not yet exist (e.g., the d4-base prompt on a fresh project). Never use `updateDoc()` for instructor dashboard writes.
+
+---
+
 ## 2026-04-10 — Fix: Student View toggle navigation
 
 **File:** `src/components/Header.jsx`

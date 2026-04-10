@@ -7,7 +7,6 @@ import {
   getDoc,
   getDocs,
   setDoc,
-  updateDoc,
   addDoc,
   serverTimestamp,
   query,
@@ -60,12 +59,12 @@ function InlinePromptEditor({ docPath, initialData, userEmail, label }) {
       const ref = doc(db, ...segments);
       const newVersion = version + 1;
       const now = serverTimestamp();
-      await updateDoc(ref, {
+      await setDoc(ref, {
         content: contentRef.current,
         version: newVersion,
         updatedAt: now,
         updatedBy: userEmail,
-      });
+      }, { merge: true });
       setVersion(newVersion);
       setUpdatedBy(userEmail);
       setDirty(false);
@@ -132,7 +131,7 @@ function DocEditor({ doc: docData, assignmentId, userEmail, onSaved }) {
     try {
       const { title: t, content: c, type: ty, includeInPrompt: ip } = fieldsRef.current;
       const ref = doc(db, 'prompts', 'd4-assignments', assignmentId, 'docs', docData.id);
-      await updateDoc(ref, {
+      await setDoc(ref, {
         title: t,
         content: c,
         type: ty,
@@ -140,7 +139,7 @@ function DocEditor({ doc: docData, assignmentId, userEmail, onSaved }) {
         version: (docData.version || 0) + 1,
         updatedAt: serverTimestamp(),
         updatedBy: userEmail,
-      });
+      }, { merge: true });
       setDirty(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -276,7 +275,7 @@ function AssignmentEditor({ assignmentId, userEmail, onBack }) {
       const currentForm = formRef.current;
       const currentData = dataRef.current;
       const ref = doc(db, 'prompts', 'd4-assignments', assignmentId);
-      await updateDoc(ref, {
+      await setDoc(ref, {
         ...currentForm,
         version: (currentData?.version || 0) + 1,
         updatedAt: serverTimestamp(),
@@ -284,7 +283,7 @@ function AssignmentEditor({ assignmentId, userEmail, onBack }) {
         active: currentForm.active === true || currentForm.active === 'true',
         order: parseInt(currentForm.order) || 0,
         estimatedMinutes: parseInt(currentForm.estimatedMinutes) || 0,
-      });
+      }, { merge: true });
       setDirty(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -606,7 +605,7 @@ function CaseStudyEditor({ caseStudyId, userEmail, onBack }) {
     try {
       const ref = doc(db, 'prompts', 'casestudies', caseStudyId);
       const currentForm = formRef.current;
-      await updateDoc(ref, {
+      await setDoc(ref, {
         ...currentForm,
         concepts: conceptsRef.current,
         primarySources: sourcesRef.current,
@@ -617,7 +616,7 @@ function CaseStudyEditor({ caseStudyId, userEmail, onBack }) {
         active: currentForm.active === true || currentForm.active === 'true',
         order: parseInt(currentForm.order) || 0,
         estimatedMinutes: parseInt(currentForm.estimatedMinutes) || 0,
-      });
+      }, { merge: true });
       setDirty(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
