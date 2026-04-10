@@ -1,0 +1,232 @@
+/* Assignment / D4 page */
+.assignment-page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Session list view */
+.session-list-view {
+  flex: 1;
+  overflow-y: auto;
+  padding: 40px;
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.session-list-view h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.session-list-view .assignment-subtitle {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 32px;
+}
+
+.session-list-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.session-list-controls h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.session-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.session-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+}
+
+.session-table td {
+  padding: 14px 16px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.session-table tr:last-child td {
+  border-bottom: none;
+}
+
+.session-table tr:hover td {
+  background: var(--bg-hover);
+}
+
+.session-table tr {
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.session-number {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+/* Three-column chat layout */
+.assignment-layout {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* Left sidebar */
+.assignment-sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 20px 0;
+}
+
+.assignment-sidebar .sidebar-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  padding: 0 16px;
+}
+
+.assignment-sidebar .sidebar-section {
+  padding: 0 16px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 16px;
+}
+
+.assignment-title-sidebar {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+  margin-bottom: 4px;
+}
+
+.assignment-mentor {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.session-info {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.session-info .session-num {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.sidebar-link-btn {
+  background: none;
+  color: var(--accent);
+  font-size: 13px;
+  padding: 4px 0;
+  text-align: left;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.sidebar-link-btn:hover {
+  color: var(--accent-hover);
+}
+
+.sidebar-new-session-btn {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: 1px solid rgba(88, 166, 255, 0.3);
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+  transition: background 0.15s;
+}
+
+.sidebar-new-session-btn:hover {
+  background: rgba(88, 166, 255, 0.25);
+}
+
+/* Chat area (middle) */
+.assignment-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Right panel */
+.assignment-right-panel {
+  width: 300px;
+  flex-shrink: 0;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.right-panel-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.right-panel-tab {
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: none;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: color 0.15s;
+  cursor: pointer;
+}
+
+.right-panel-tab:hover {
+  color: var(--text-secondary);
+}
+
+.right-panel-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.right-panel-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
