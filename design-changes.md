@@ -202,3 +202,32 @@ The corresponding state initializers and Firestore write fields were also remove
 **Design.md addition** (under `## INSTRUCTOR DASHBOARD → Case Studies → New Case Study`):
 
 > The New Case Study form collects only: ID (permanent slug), title, display order, active flag, and system prompt content. Subtitle, tutor name/role, prereqs, and estimated minutes are omitted from creation and can be filled in via the case study editor after creation.
+
+---
+
+## 2026-04-10 — Change: Simplify Assignment Metadata & Prompt editor; remove display order from assignment creation
+
+**File:** `src/pages/InstructorDashboard.jsx` (`AssignmentEditor`, `NewAssignmentForm`)
+
+**Changes:**
+
+**`AssignmentEditor` (Assignment Metadata & Prompt section):**
+Removed five fields that are either defined in the prompt itself or not relevant to edit post-creation:
+- Subtitle
+- Mentor Name
+- Mentor Role
+- Prereqs
+- Estimated Minutes
+- Display Order
+
+The `handleSave` write was also tightened to explicitly list only the fields that remain (`title`, `description`, `content`, `active`) rather than spreading the full form object, which prevented stale removed fields from being re-written to Firestore.
+
+**`NewAssignmentForm`:**
+Removed Display Order field and its state initializer. The main assignment prompt is always displayed first and has no meaningful position relative to other assignments on the landing page that would need to be set at creation time.
+
+**Rationale for display order:**
+The main assignment prompt always appears first in a session — it is the primary content, not a peer of the supporting documents. Display order only applies to supporting documents (which tab they appear in and in what sequence in the right panel). Supporting documents retain their `order` field and it can be set in `DocEditor`.
+
+**Design.md addition** (under `## INSTRUCTOR DASHBOARD → D4 Assignments`):
+
+> The assignment editor exposes only: ID (read-only), title, description, active flag, and system prompt. Mentor name/role, subtitle, prereqs, and estimated minutes are defined inside the prompt text. Display order does not apply to the main assignment — only supporting documents have an `order` field that controls their tab sequence.

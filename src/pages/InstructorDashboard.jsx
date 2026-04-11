@@ -276,13 +276,13 @@ function AssignmentEditor({ assignmentId, userEmail, onBack }) {
       const currentData = dataRef.current;
       const ref = doc(db, 'd4-assignments', assignmentId);
       await setDoc(ref, {
-        ...currentForm,
+        title: currentForm.title,
+        description: currentForm.description,
+        content: currentForm.content,
+        active: currentForm.active === true || currentForm.active === 'true',
         version: (currentData?.version || 0) + 1,
         updatedAt: serverTimestamp(),
         updatedBy: userEmail,
-        active: currentForm.active === true || currentForm.active === 'true',
-        order: parseInt(currentForm.order) || 0,
-        estimatedMinutes: parseInt(currentForm.estimatedMinutes) || 0,
       }, { merge: true });
       setDirty(false);
       setSaved(true);
@@ -349,30 +349,6 @@ function AssignmentEditor({ assignmentId, userEmail, onBack }) {
             <label className="form-label">Title</label>
             <input className="form-input" value={form.title || ''} onChange={f('title')} />
           </div>
-          <div className="form-group">
-            <label className="form-label">Subtitle</label>
-            <input className="form-input" value={form.subtitle || ''} onChange={f('subtitle')} />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Mentor Name</label>
-            <input className="form-input" value={form.mentorName || ''} onChange={f('mentorName')} placeholder="Klaus" />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Mentor Role</label>
-            <input className="form-input" value={form.mentorRole || ''} onChange={f('mentorRole')} placeholder="Senior Software Architect" />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Prereqs</label>
-            <input className="form-input" value={form.prereqs || ''} onChange={f('prereqs')} />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Estimated Minutes</label>
-            <input className="form-input" type="number" value={form.estimatedMinutes || ''} onChange={f('estimatedMinutes')} />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Display Order</label>
-            <input className="form-input" type="number" value={form.order || ''} onChange={f('order')} />
-          </div>
           <div className="form-group full-width">
             <label className="form-label">Description</label>
             <textarea className="form-textarea" rows={3} value={form.description || ''} onChange={f('description')} />
@@ -438,9 +414,7 @@ function NewAssignmentForm({ userEmail, onCreated, onCancel }) {
   const [form, setForm] = useState({
     id: '',
     title: '',
-    subtitle: '',
     description: '',
-    order: '1',
     active: true,
     content: '',
   });
@@ -464,9 +438,7 @@ function NewAssignmentForm({ userEmail, onCreated, onCancel }) {
 
       await setDoc(ref, {
         title: form.title,
-        subtitle: form.subtitle,
         description: form.description,
-        order: parseInt(form.order) || 1,
         active: !!form.active,
         content: form.content,
         version: 1,
@@ -501,14 +473,6 @@ function NewAssignmentForm({ userEmail, onCreated, onCancel }) {
         <div className="form-group">
           <label className="form-label">Title</label>
           <input className="form-input" value={form.title} onChange={f('title')} />
-        </div>
-        <div className="form-group">
-          <label className="form-label">Subtitle</label>
-          <input className="form-input" value={form.subtitle} onChange={f('subtitle')} />
-        </div>
-        <div className="form-group">
-          <label className="form-label">Display Order</label>
-          <input className="form-input" type="number" value={form.order} onChange={f('order')} />
         </div>
         <div className="form-group full-width">
           <label className="form-label">Description</label>
