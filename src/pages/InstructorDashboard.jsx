@@ -799,8 +799,7 @@ function CaseStudyEditor({ caseStudyId, userEmail, onBack }) {
 // ─── New Case Study Form ──────────────────────────────────────────────────────
 function NewCaseStudyForm({ userEmail, onCreated, onCancel }) {
   const [form, setForm] = useState({
-    id: '', title: '', subtitle: '', tutorName: '', tutorRole: '',
-    prereqs: '', estimatedMinutes: '', order: '1', active: true, content: '',
+    id: '', title: '', order: '1', active: true, content: '',
   });
   const [saving, setSaving] = useState(false);
   const [idError, setIdError] = useState('');
@@ -817,10 +816,7 @@ function NewCaseStudyForm({ userEmail, onCreated, onCancel }) {
       const existing = await getDoc(ref);
       if (existing.exists()) { setIdError('A case study with this ID already exists.'); setSaving(false); return; }
       await setDoc(ref, {
-        title: form.title, subtitle: form.subtitle,
-        tutorName: form.tutorName, tutorRole: form.tutorRole,
-        prereqs: form.prereqs,
-        estimatedMinutes: parseInt(form.estimatedMinutes) || 0,
+        title: form.title,
         order: parseInt(form.order) || 1,
         active: !!form.active,
         content: form.content,
@@ -847,26 +843,6 @@ function NewCaseStudyForm({ userEmail, onCreated, onCancel }) {
         <div className="form-group">
           <label className="form-label">Title</label>
           <input className="form-input" value={form.title} onChange={f('title')} />
-        </div>
-        <div className="form-group">
-          <label className="form-label">Subtitle</label>
-          <input className="form-input" value={form.subtitle} onChange={f('subtitle')} />
-        </div>
-        <div className="form-group">
-          <label className="form-label">Tutor Name</label>
-          <input className="form-input" value={form.tutorName} onChange={f('tutorName')} />
-        </div>
-        <div className="form-group">
-          <label className="form-label">Tutor Role</label>
-          <input className="form-input" value={form.tutorRole} onChange={f('tutorRole')} />
-        </div>
-        <div className="form-group">
-          <label className="form-label">Prereqs</label>
-          <input className="form-input" value={form.prereqs} onChange={f('prereqs')} />
-        </div>
-        <div className="form-group">
-          <label className="form-label">Estimated Minutes</label>
-          <input className="form-input" type="number" value={form.estimatedMinutes} onChange={f('estimatedMinutes')} />
         </div>
         <div className="form-group">
           <label className="form-label">Display Order</label>

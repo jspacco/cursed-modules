@@ -181,3 +181,24 @@ The corresponding state initializers and Firestore write fields were also remove
 **Design.md addition** (under `## INSTRUCTOR DASHBOARD → D4 Assignments → New Assignment`):
 
 > The New Assignment form collects only: ID (permanent slug), title, subtitle, description, display order, active flag, and system prompt content. Mentor name/role are defined in the prompt text. Prereqs and estimated minutes are omitted from creation and can be added later in the assignment editor if needed.
+
+---
+
+## 2026-04-10 — Change: Remove subtitle, tutor name, tutor role, prereqs, and estimated minutes from New Case Study form
+
+**File:** `src/pages/InstructorDashboard.jsx` (`NewCaseStudyForm`)
+
+**Change:** Removed five fields from the "New Case Study" creation form:
+- Subtitle
+- Tutor Name
+- Tutor Role
+- Prereqs
+- Estimated Minutes
+
+These are defined in the system prompt or can be added later via the CaseStudyEditor. The creation form now collects only: ID, title, display order, active flag, and system prompt content.
+
+The corresponding state initializers and Firestore write fields were also removed.
+
+**Design.md addition** (under `## INSTRUCTOR DASHBOARD → Case Studies → New Case Study`):
+
+> The New Case Study form collects only: ID (permanent slug), title, display order, active flag, and system prompt content. Subtitle, tutor name/role, prereqs, and estimated minutes are omitted from creation and can be filled in via the case study editor after creation.
