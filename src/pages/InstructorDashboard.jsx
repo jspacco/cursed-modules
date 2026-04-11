@@ -130,7 +130,7 @@ function DocEditor({ doc: docData, assignmentId, userEmail, onSaved }) {
     setSaving(true);
     try {
       const { title: t, content: c, type: ty, includeInPrompt: ip } = fieldsRef.current;
-      const ref = doc(db, 'prompts', 'd4-assignments', assignmentId, 'docs', docData.id);
+      const ref = doc(db, 'd4-assignments', assignmentId, 'docs', docData.id);
       await setDoc(ref, {
         title: t,
         content: c,
@@ -247,7 +247,7 @@ function AssignmentEditor({ assignmentId, userEmail, onBack }) {
   const load = async () => {
     setLoading(true);
     try {
-      const ref = doc(db, 'prompts', 'd4-assignments', assignmentId);
+      const ref = doc(db, 'd4-assignments', assignmentId);
       const snap = await getDoc(ref);
       if (snap.exists()) {
         const d = snap.data();
@@ -258,7 +258,7 @@ function AssignmentEditor({ assignmentId, userEmail, onBack }) {
       }
       const docsSnap = await getDocs(
         query(
-          collection(db, 'prompts', 'd4-assignments', assignmentId, 'docs'),
+          collection(db, 'd4-assignments', assignmentId, 'docs'),
           orderBy('order', 'asc')
         )
       );
@@ -274,7 +274,7 @@ function AssignmentEditor({ assignmentId, userEmail, onBack }) {
     try {
       const currentForm = formRef.current;
       const currentData = dataRef.current;
-      const ref = doc(db, 'prompts', 'd4-assignments', assignmentId);
+      const ref = doc(db, 'd4-assignments', assignmentId);
       await setDoc(ref, {
         ...currentForm,
         version: (currentData?.version || 0) + 1,
@@ -296,7 +296,7 @@ function AssignmentEditor({ assignmentId, userEmail, onBack }) {
   const handleAddDoc = async () => {
     try {
       const maxOrder = supportingDocs.reduce((m, d) => Math.max(m, d.order || 0), 0);
-      const newDocRef = doc(collection(db, 'prompts', 'd4-assignments', assignmentId, 'docs'));
+      const newDocRef = doc(collection(db, 'd4-assignments', assignmentId, 'docs'));
       await setDoc(newDocRef, {
         title: '',
         content: '',
@@ -462,7 +462,7 @@ function NewAssignmentForm({ userEmail, onCreated, onCancel }) {
 
     setSaving(true);
     try {
-      const ref = doc(db, 'prompts', 'd4-assignments', form.id);
+      const ref = doc(db, 'd4-assignments', form.id);
       const existing = await getDoc(ref);
       if (existing.exists()) { setIdError('An assignment with this ID already exists.'); setSaving(false); return; }
 
@@ -586,7 +586,7 @@ function CaseStudyEditor({ caseStudyId, userEmail, onBack }) {
   const load = async () => {
     setLoading(true);
     try {
-      const ref = doc(db, 'prompts', 'casestudies', caseStudyId);
+      const ref = doc(db, 'casestudies', caseStudyId);
       const snap = await getDoc(ref);
       if (snap.exists()) {
         const d = snap.data();
@@ -603,7 +603,7 @@ function CaseStudyEditor({ caseStudyId, userEmail, onBack }) {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const ref = doc(db, 'prompts', 'casestudies', caseStudyId);
+      const ref = doc(db, 'casestudies', caseStudyId);
       const currentForm = formRef.current;
       await setDoc(ref, {
         ...currentForm,
@@ -837,7 +837,7 @@ function NewCaseStudyForm({ userEmail, onCreated, onCancel }) {
     if (!/^[a-z0-9-]+$/.test(form.id)) { setIdError('ID must be lowercase, numbers, and hyphens only.'); return; }
     setSaving(true);
     try {
-      const ref = doc(db, 'prompts', 'casestudies', form.id);
+      const ref = doc(db, 'casestudies', form.id);
       const existing = await getDoc(ref);
       if (existing.exists()) { setIdError('A case study with this ID already exists.'); setSaving(false); return; }
       await setDoc(ref, {
@@ -1201,9 +1201,9 @@ function SystemPromptsView({ userEmail }) {
     setLoading(true);
     try {
       const [baseSnap, assignSnap, csSnap] = await Promise.all([
-        getDoc(doc(db, 'prompts', 'd4-base')),
-        getDocs(collection(db, 'prompts', 'd4-assignments')).catch(() => ({ docs: [] })),
-        getDocs(collection(db, 'prompts', 'casestudies')).catch(() => ({ docs: [] })),
+        getDoc(doc(db, 'config', 'd4-base')),
+        getDocs(collection(db, 'd4-assignments')).catch(() => ({ docs: [] })),
+        getDocs(collection(db, 'casestudies')).catch(() => ({ docs: [] })),
       ]);
       if (baseSnap.exists()) setD4Base({ ...baseSnap.data() });
       setAssignments(assignSnap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => (a.order || 0) - (b.order || 0)));
@@ -1268,7 +1268,7 @@ function SystemPromptsView({ userEmail }) {
 
       {subTab === 'd4base' && (
         <InlinePromptEditor
-          docPath="prompts/d4-base"
+          docPath="config/d4-base"
           initialData={d4Base}
           userEmail={userEmail}
           label="D4 Base Prompt"

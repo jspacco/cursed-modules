@@ -58,7 +58,7 @@ export default function Assignment({ user, isProfessor, signOut, viewMode, setVi
   const loadAssignment = async () => {
     setAssignLoading(true);
     try {
-      const ref = doc(db, 'prompts', 'd4-assignments', assignmentId);
+      const ref = doc(db, 'd4-assignments', assignmentId);
       const snap = await getDoc(ref);
       if (snap.exists()) {
         setAssignment({ id: snap.id, ...snap.data() });
@@ -76,7 +76,7 @@ export default function Assignment({ user, isProfessor, signOut, viewMode, setVi
 
   const loadSupportingDocs = async () => {
     try {
-      const docsRef = collection(db, 'prompts', 'd4-assignments', assignmentId, 'docs');
+      const docsRef = collection(db, 'd4-assignments', assignmentId, 'docs');
       const q = query(docsRef, orderBy('order', 'asc'));
       const snap = await getDocs(q);
       const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -100,14 +100,14 @@ export default function Assignment({ user, isProfessor, signOut, viewMode, setVi
     setError(null);
     try {
       // Load base prompt
-      const baseRef = doc(db, 'prompts', 'd4-base');
+      const baseRef = doc(db, 'config', 'd4-base');
       const baseSnap = await getDoc(baseRef);
       const basePrompt = baseSnap.exists()
         ? { content: baseSnap.data().content, version: baseSnap.data().version }
         : { content: '', version: 1 };
 
       // Load assignment prompt (fresh)
-      const assignRef = doc(db, 'prompts', 'd4-assignments', assignmentId);
+      const assignRef = doc(db, 'd4-assignments', assignmentId);
       const assignSnap = await getDoc(assignRef);
       const assignmentPrompt = assignSnap.exists()
         ? { content: assignSnap.data().content, version: assignSnap.data().version }

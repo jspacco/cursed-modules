@@ -75,8 +75,7 @@ export default function CaseStudy({ user, isProfessor, signOut, viewMode, setVie
   const loadCaseStudy = async () => {
     setCsLoading(true);
     try {
-      // Try the design.md path: /prompts/casestudies/{caseStudyId}
-      const ref = doc(db, 'prompts', 'casestudies', caseStudyId);
+      const ref = doc(db, 'casestudies', caseStudyId);
       const snap = await getDoc(ref);
       if (snap.exists()) {
         setCaseStudy({ id: snap.id, ...snap.data() });

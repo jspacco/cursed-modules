@@ -129,3 +129,35 @@ The DirtyProvider renders the confirmation modal at the app root and is
 responsible for calling the registered save function, clearing dirty state,
 and invoking the pending navigation.
 ```
+
+---
+
+## 2026-04-10 — Fix: Restructure Firestore paths to flat top-level collections
+
+**Files modified:** `src/pages/InstructorDashboard.jsx`, `src/pages/Assignment.jsx`, `src/pages/CaseStudy.jsx`, `src/pages/Landing.jsx`
+
+**Problem:** The original design used paths like `/prompts/d4-base`, `/prompts/d4-assignments/{id}`, and `/prompts/casestudies/{id}`. These are invalid in Firestore because Firestore requires paths to alternate collection/document segments. `/prompts/d4-assignments/{id}` has 3 segments, which is a valid document path only if `d4-assignments` is a subcollection inside the document `prompts` — but `prompts` is being used as a collection, not a document. You cannot nest a collection inside another collection.
+
+**Fix:** Restructured to flat top-level collections:
+
+| Old path | New path |
+|---|---|
+| `doc(db, 'prompts', 'd4-base')` | `doc(db, 'config', 'd4-base')` |
+| `collection(db, 'prompts', 'd4-assignments')` | `collection(db, 'd4-assignments')` |
+| `doc(db, 'prompts', 'd4-assignments', id)` | `doc(db, 'd4-assignments', id)` |
+| `collection(db, 'prompts', 'd4-assignments', id, 'docs')` | `collection(db, 'd4-assignments', id, 'docs')` |
+| `collection(db, 'prompts', 'casestudies')` | `collection(db, 'casestudies')` |
+| `doc(db, 'prompts', 'casestudies', id)` | `doc(db, 'casestudies', id)` |
+| `docPath="prompts/d4-base"` (prop) | `docPath="config/d4-base"` |
+
+**Landing.jsx:** Also simplified the multi-fallback loading strategy (which tried several broken paths in sequence) to a single `Promise.all` against the correct flat paths.
+
+**Design.md addition** (replace Firestore path references in `## DATA MODEL`):
+
+> **Firestore collections:**
+> - `/config/d4-base` — single document holding the D4 base system prompt (`content`, `version`, `updatedAt`, `updatedBy`)
+> - `/d4-assignments/{id}` — one document per assignment (metadata + prompt content); subcollection `/d4-assignments/{id}/docs/{docId}` holds supporting documents
+> - `/casestudies/{id}` — one document per case study (metadata + prompt + concepts + primarySources + quickPrompts)
+> - `/students/{email}/casestudies/{id}` and `/students/{email}/assignments/{id}` — per-student progress (unchanged)
+>
+> All paths use flat top-level collections. Firestore path segments must alternate collection/document. Never use a collection name as a document ID to create pseudo-nesting.

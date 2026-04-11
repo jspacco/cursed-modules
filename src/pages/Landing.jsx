@@ -45,110 +45,21 @@ export default function Landing({ user, loading, isProfessor, signIn, signOut, v
   const loadContent = async () => {
     setContentLoading(true);
     try {
-      // Load active case studies
-      const csQuery = query(
-        collection(db, 'prompts', 'casestudies', 'casestudies'),
-        where('active', '==', true),
-        orderBy('order', 'asc')
-      );
-
-      // Load active assignments
-      const assignQuery = query(
-        collection(db, 'prompts', 'd4-assignments', 'd4-assignments'),
-        where('active', '==', true),
-        orderBy('order', 'asc')
-      );
-
-      // Also try flat subcollection paths
-      const [csSnap, assignSnap] = await Promise.allSettled([
-        getDocs(query(collection(db, 'prompts'), orderBy('order', 'asc'))).catch(() => null),
-        // Try direct subcollection
-        getDocs(collection(db, 'prompts')),
-      ]);
-
-      // Load from correct Firestore paths
-      const [csResult, assignResult] = await Promise.all([
-        getDocs(
-          query(
-            collection(db, 'prompts', 'casestudies', 'casestudies'),
-            where('active', '==', true),
-            orderBy('order', 'asc')
-          )
-        ).catch(() =>
-          // Fallback: try root-level
-          getDocs(
-            query(
-              collection(db, 'casestudies'),
-              where('active', '==', true),
-              orderBy('order', 'asc')
-            )
-          ).catch(() => null)
-        ),
-        getDocs(
-          query(
-            collection(db, 'prompts', 'd4-assignments', 'd4-assignments'),
-            where('active', '==', true),
-            orderBy('order', 'asc')
-          )
-        ).catch(() =>
-          getDocs(
-            query(
-              collection(db, 'd4-assignments'),
-              where('active', '==', true),
-              orderBy('order', 'asc')
-            )
-          ).catch(() => null)
-        ),
-      ]);
-
-      // Try the actual data model: /prompts/{doc} where doc is casestudies or d4-assignments
-      // The real structure per design: /prompts/casestudies/{caseStudyId}
-      const [csReal, assignReal] = await Promise.all([
-        getDocs(collection(db, 'prompts', 'casestudies', 'items')).catch(async () => {
-          // Try treating casestudies as subcollection directly under prompts doc
-          return getDocs(collection(db, 'prompts', 'casestudies', 'casestudies')).catch(() => ({ docs: [] }));
-        }),
-        getDocs(collection(db, 'prompts', 'd4-assignments', 'items')).catch(async () => {
-          return getDocs(collection(db, 'prompts', 'd4-assignments', 'd4-assignments')).catch(() => ({ docs: [] }));
-        }),
-      ]);
-
-      // Load student progress
-      const [studentCsSnap, studentAssignSnap] = await Promise.all([
+      const [csSnap, assignSnap, studentCsSnap, studentAssignSnap] = await Promise.all([
+        getDocs(query(collection(db, 'casestudies'), where('active', '==', true), orderBy('order', 'asc'))).catch(() => ({ docs: [] })),
+        getDocs(query(collection(db, 'd4-assignments'), where('active', '==', true), orderBy('order', 'asc'))).catch(() => ({ docs: [] })),
         getDocs(collection(db, 'students', user.email, 'casestudies')).catch(() => ({ docs: [] })),
         getDocs(collection(db, 'students', user.email, 'assignments')).catch(() => ({ docs: [] })),
       ]);
 
       const csProgress = {};
-      studentCsSnap.docs.forEach((d) => {
-        csProgress[d.id] = d.data();
-      });
-
+      studentCsSnap.docs.forEach((d) => { csProgress[d.id] = d.data(); });
       const assignProgress = {};
-      studentAssignSnap.docs.forEach((d) => {
-        assignProgress[d.id] = d.data();
-      });
-
+      studentAssignSnap.docs.forEach((d) => { assignProgress[d.id] = d.data(); });
       setStudentData({ casestudies: csProgress, assignments: assignProgress });
 
-      // Build final lists — try multiple path strategies
-      let finalCs = [];
-      let finalAssign = [];
-
-      if (csReal.docs?.length > 0) {
-        finalCs = csReal.docs.map((d) => ({ id: d.id, ...d.data() })).filter((c) => c.active !== false);
-      } else if (csResult?.docs?.length > 0) {
-        finalCs = csResult.docs.map((d) => ({ id: d.id, ...d.data() }));
-      }
-
-      if (assignReal.docs?.length > 0) {
-        finalAssign = assignReal.docs.map((d) => ({ id: d.id, ...d.data() })).filter((a) => a.active !== false);
-      } else if (assignResult?.docs?.length > 0) {
-        finalAssign = assignResult.docs.map((d) => ({ id: d.id, ...d.data() }));
-      }
-
-      setCaseStudies(finalCs.sort((a, b) => (a.order || 0) - (b.order || 0)));
-      setAssignments(finalAssign.sort((a, b) => (a.order || 0) - (b.order || 0)));
+      setCaseStudies(csSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      setAssignments(assignSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
     } catch (err) {
       console.error('Error loading content:', err);
     }
