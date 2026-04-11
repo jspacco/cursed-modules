@@ -161,3 +161,23 @@ and invoking the pending navigation.
 > - `/students/{email}/casestudies/{id}` and `/students/{email}/assignments/{id}` — per-student progress (unchanged)
 >
 > All paths use flat top-level collections. Firestore path segments must alternate collection/document. Never use a collection name as a document ID to create pseudo-nesting.
+
+---
+
+## 2026-04-10 — Change: Remove mentor name, mentor role, prereqs, and estimated minutes from New Assignment form
+
+**File:** `src/pages/InstructorDashboard.jsx` (`NewAssignmentForm`)
+
+**Change:** Removed four fields from the "New Assignment" creation form:
+- Mentor Name
+- Mentor Role
+- Prereqs
+- Estimated Minutes
+
+These fields are not needed at creation time: mentor name and role are defined inside the system prompt itself, and prereqs/estimated minutes are metadata the instructor can add later via the AssignmentEditor if desired. Removing them keeps the creation form focused on the essentials: ID, title, subtitle, description, display order, active flag, and system prompt.
+
+The corresponding state initializers and Firestore write fields were also removed so these values are no longer written to new assignment documents.
+
+**Design.md addition** (under `## INSTRUCTOR DASHBOARD → D4 Assignments → New Assignment`):
+
+> The New Assignment form collects only: ID (permanent slug), title, subtitle, description, display order, active flag, and system prompt content. Mentor name/role are defined in the prompt text. Prereqs and estimated minutes are omitted from creation and can be added later in the assignment editor if needed.

@@ -439,10 +439,6 @@ function NewAssignmentForm({ userEmail, onCreated, onCancel }) {
     id: '',
     title: '',
     subtitle: '',
-    mentorName: 'Klaus',
-    mentorRole: 'Senior Software Architect',
-    prereqs: '',
-    estimatedMinutes: '',
     description: '',
     order: '1',
     active: true,
@@ -469,10 +465,6 @@ function NewAssignmentForm({ userEmail, onCreated, onCancel }) {
       await setDoc(ref, {
         title: form.title,
         subtitle: form.subtitle,
-        mentorName: form.mentorName || 'Klaus',
-        mentorRole: form.mentorRole || 'Senior Software Architect',
-        prereqs: form.prereqs,
-        estimatedMinutes: parseInt(form.estimatedMinutes) || 0,
         description: form.description,
         order: parseInt(form.order) || 1,
         active: !!form.active,
@@ -513,22 +505,6 @@ function NewAssignmentForm({ userEmail, onCreated, onCancel }) {
         <div className="form-group">
           <label className="form-label">Subtitle</label>
           <input className="form-input" value={form.subtitle} onChange={f('subtitle')} />
-        </div>
-        <div className="form-group">
-          <label className="form-label">Mentor Name</label>
-          <input className="form-input" value={form.mentorName} onChange={f('mentorName')} />
-        </div>
-        <div className="form-group">
-          <label className="form-label">Mentor Role</label>
-          <input className="form-input" value={form.mentorRole} onChange={f('mentorRole')} />
-        </div>
-        <div className="form-group">
-          <label className="form-label">Prereqs</label>
-          <input className="form-input" value={form.prereqs} onChange={f('prereqs')} />
-        </div>
-        <div className="form-group">
-          <label className="form-label">Estimated Minutes</label>
-          <input className="form-input" type="number" value={form.estimatedMinutes} onChange={f('estimatedMinutes')} />
         </div>
         <div className="form-group">
           <label className="form-label">Display Order</label>
