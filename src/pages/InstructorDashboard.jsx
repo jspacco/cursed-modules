@@ -441,6 +441,7 @@ function NewAssignmentForm({ userEmail, onCreated, onCancel }) {
         description: form.description,
         active: !!form.active,
         content: form.content,
+        order: 0,
         version: 1,
         updatedAt: serverTimestamp(),
         updatedBy: userEmail,
@@ -1099,9 +1100,7 @@ function TranscriptView({ data, onBack }) {
 }
 
 // ─── System Prompts View ──────────────────────────────────────────────────────
-function SystemPromptsView({ userEmail }) {
-  const [subTab, setSubTab] = useState('d4base');
-  const { guardedNavigate } = useDirty();
+function SystemPromptsView({ userEmail, activeTab }) {
   const [d4Base, setD4Base] = useState(null);
   const [assignments, setAssignments] = useState([]);
   const [caseStudies, setCaseStudies] = useState([]);
@@ -1172,17 +1171,7 @@ function SystemPromptsView({ userEmail }) {
 
   return (
     <div>
-      <div className="dashboard-section-header">
-        <h2>System Prompts</h2>
-      </div>
-
-      <div className="subnav-tabs">
-        <button className={`subnav-tab${subTab === 'd4base' ? ' active' : ''}`} onClick={() => guardedNavigate(() => setSubTab('d4base'))}>D4 Base</button>
-        <button className={`subnav-tab${subTab === 'd4assignments' ? ' active' : ''}`} onClick={() => guardedNavigate(() => setSubTab('d4assignments'))}>D4 Assignments</button>
-        <button className={`subnav-tab${subTab === 'casestudies' ? ' active' : ''}`} onClick={() => guardedNavigate(() => setSubTab('casestudies'))}>Case Studies</button>
-      </div>
-
-      {subTab === 'd4base' && (
+      {activeTab === 'd4base' && (
         <InlinePromptEditor
           docPath="config/d4-base"
           initialData={d4Base}
@@ -1191,7 +1180,7 @@ function SystemPromptsView({ userEmail }) {
         />
       )}
 
-      {subTab === 'd4assignments' && (
+      {activeTab === 'd4assignments' && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
             <button className="btn btn-primary" onClick={() => setShowNewAssignment(true)}>
@@ -1223,7 +1212,7 @@ function SystemPromptsView({ userEmail }) {
         </div>
       )}
 
-      {subTab === 'casestudies' && (
+      {activeTab === 'casestudies' && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
             <button className="btn btn-primary" onClick={() => setShowNewCaseStudy(true)}>
@@ -1292,16 +1281,30 @@ export default function InstructorDashboard({ user, isProfessor, signOut, permis
             Students
           </button>
           <button
-            className={`dashboard-nav-item${navTab === 'prompts' ? ' active' : ''}`}
-            onClick={() => guardedNavigate(() => setNavTab('prompts'))}
+            className={`dashboard-nav-item${navTab === 'd4base' ? ' active' : ''}`}
+            onClick={() => guardedNavigate(() => setNavTab('d4base'))}
           >
-            System Prompts
+            D4 Base
+          </button>
+          <button
+            className={`dashboard-nav-item${navTab === 'd4assignments' ? ' active' : ''}`}
+            onClick={() => guardedNavigate(() => setNavTab('d4assignments'))}
+          >
+            D4 Assignments
+          </button>
+          <button
+            className={`dashboard-nav-item${navTab === 'casestudies' ? ' active' : ''}`}
+            onClick={() => guardedNavigate(() => setNavTab('casestudies'))}
+          >
+            Case Studies
           </button>
         </nav>
 
         <main className="dashboard-main">
           {navTab === 'students' && <StudentsView userEmail={user?.email} />}
-          {navTab === 'prompts' && <SystemPromptsView userEmail={user?.email} />}
+          {(navTab === 'd4base' || navTab === 'd4assignments' || navTab === 'casestudies') && (
+            <SystemPromptsView userEmail={user?.email} activeTab={navTab} />
+          )}
         </main>
       </div>
     </div>

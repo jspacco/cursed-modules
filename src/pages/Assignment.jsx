@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { doc, getDoc, collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useSession } from '../hooks/useSession';
@@ -24,6 +24,8 @@ async function callChatAPI(messages, systemPrompt) {
 export default function Assignment({ user, isProfessor, signOut, viewMode, setViewMode }) {
   const { assignmentId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const autoNewTriggered = useRef(false);
 
   const [assignment, setAssignment] = useState(null);
   const [supportingDocs, setSupportingDocs] = useState([]);
@@ -32,7 +34,7 @@ export default function Assignment({ user, isProfessor, signOut, viewMode, setVi
   const [isThinking, setIsThinking] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('design');
+  const [activeTab, setActiveTab] = useState('description');
 
   const {
     sessions,
@@ -54,6 +56,13 @@ export default function Assignment({ user, isProfessor, signOut, viewMode, setVi
     }
     loadAssignment();
   }, [assignmentId, user]);
+
+  useEffect(() => {
+    if (!assignLoading && !sessionsLoading && location.state?.autoNew && !autoNewTriggered.current) {
+      autoNewTriggered.current = true;
+      handleNewSession();
+    }
+  }, [assignLoading, sessionsLoading]);
 
   const loadAssignment = async () => {
     setAssignLoading(true);
@@ -92,7 +101,7 @@ export default function Assignment({ user, isProfessor, signOut, viewMode, setVi
     // Reload supporting docs fresh when opening a session
     await loadSupportingDocs();
     setView('chat');
-    setActiveTab('design');
+    setActiveTab('description');
   };
 
   const handleNewSession = async () => {
@@ -127,21 +136,27 @@ export default function Assignment({ user, isProfessor, signOut, viewMode, setVi
       );
 
       setView('chat');
-      setActiveTab('design');
-
-      // Send hidden opening message
-      const openingMsg = { role: 'user', content: "I'm ready to start the design exercise." };
-      const reply = await callChatAPI([openingMsg], effective);
-
-      const assistantMsg = {
-        role: 'assistant',
-        content: reply,
-        timestamp: new Date().toISOString(),
-      };
-      await appendMessage(assistantMsg);
+      setActiveTab('description');
     } catch (err) {
       console.error(err);
       setError('Failed to start session. Please try again.');
+      setIsThinking(false);
+      return;
+    }
+
+    // Send opening trigger — isolated so a failure here doesn't kill the session.
+    try {
+      const openingMsg = { role: 'user', content: "I'm ready to start the design exercise." };
+      const reply = await callChatAPI([openingMsg], effectivePrompt);
+      if (reply) {
+        await appendMessage({
+          role: 'assistant',
+          content: reply,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    } catch (err) {
+      console.error('Opening message failed:', err);
     }
     setIsThinking(false);
   };
@@ -261,10 +276,7 @@ export default function Assignment({ user, isProfessor, signOut, viewMode, setVi
               </div>
             )}
 
-            <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <button className="sidebar-new-session-btn" onClick={handleNewSession} disabled={isThinking}>
-                + New Session
-              </button>
+            <div style={{ padding: '0 16px' }}>
               <button className="sidebar-link-btn" onClick={handleBackToList}>
                 ← All Sessions
               </button>
@@ -293,10 +305,10 @@ export default function Assignment({ user, isProfessor, signOut, viewMode, setVi
           <div className="assignment-right-panel">
             <div className="right-panel-tabs">
               <button
-                className={`right-panel-tab${activeTab === 'design' ? ' active' : ''}`}
-                onClick={() => setActiveTab('design')}
+                className={`right-panel-tab${activeTab === 'description' ? ' active' : ''}`}
+                onClick={() => setActiveTab('description')}
               >
-                Design Doc
+                Description
               </button>
               {supportingDocs.map((d) => (
                 <button
@@ -304,13 +316,28 @@ export default function Assignment({ user, isProfessor, signOut, viewMode, setVi
                   className={`right-panel-tab${activeTab === d.id ? ' active' : ''}`}
                   onClick={() => setActiveTab(d.id)}
                 >
-                  {d.title || 'Doc'}
+                  {d.title || 'Other Docs'}
                 </button>
               ))}
+              <button
+                className={`right-panel-tab${activeTab === 'design' ? ' active' : ''}`}
+                onClick={() => setActiveTab('design')}
+              >
+                Design Doc
+              </button>
             </div>
 
             <div className="right-panel-content">
-              {activeTab === 'design' ? (
+              {activeTab === 'description' ? (
+                <div>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '12px', fontSize: '14px' }}>
+                    {assignment?.title}
+                  </div>
+                  <p style={{ fontSize: '13px', lineHeight: 1.7, color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>
+                    {assignment?.description || 'No description provided.'}
+                  </p>
+                </div>
+              ) : activeTab === 'design' ? (
                 <DesignDocPanel designDoc={designDoc} />
               ) : (
                 (() => {

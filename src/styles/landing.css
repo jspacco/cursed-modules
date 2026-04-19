@@ -215,10 +215,12 @@
   margin-top: auto;
   padding-top: 12px;
   border-top: 1px solid var(--border-subtle);
+  display: flex;
+  gap: 8px;
 }
 
 .card-btn {
-  width: 100%;
+  flex: 1;
   padding: 9px 16px;
   border-radius: var(--radius-sm);
   font-size: 14px;

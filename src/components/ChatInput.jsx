@@ -74,6 +74,13 @@ export default function ChatInput({ value, onChange, onSend, disabled, quickProm
     }
   }, [value]);
 
+  // Refocus after server response completes
+  useEffect(() => {
+    if (!disabled) {
+      textareaRef.current?.focus();
+    }
+  }, [disabled]);
+
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();

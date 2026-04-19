@@ -16,10 +16,17 @@ export function useSession(user, assignmentId) {
   const [sessions, setSessions] = useState([]);
   const [currentSession, setCurrentSession] = useState(null);
   const [messages, setMessages] = useState([]);
+  const messagesRef = useRef([]);
   const [effectivePrompt, setEffectivePrompt] = useState('');
   const [designDoc, setDesignDoc] = useState('');
   const [loading, setLoading] = useState(true);
   const sessionDocRef = useRef(null);
+
+  // Keep messagesRef in sync so appendMessage never reads stale closure state.
+  const setMessagesSync = (msgs) => {
+    messagesRef.current = msgs;
+    setMessages(msgs);
+  };
 
   useEffect(() => {
     if (!user || !assignmentId) return;
@@ -58,7 +65,7 @@ export function useSession(user, assignmentId) {
     if (snap.exists()) {
       const data = snap.data();
       setCurrentSession({ id: sessionId, ...data });
-      setMessages(data.messages || []);
+      setMessagesSync(data.messages || []);
       setEffectivePrompt(data.prompts?.effective || '');
       setDesignDoc(data.designDoc || '');
     }
@@ -127,8 +134,18 @@ export function useSession(user, assignmentId) {
     };
 
     await setDoc(ref, sessionData);
+
+    // Write parent assignment doc so Landing page can detect progress via
+    // getDocs(collection(db, 'students', email, 'assignments')).
+    // Firestore subcollections don't create their parent document automatically.
+    const assignmentDocRef = doc(db, 'students', user.email, 'assignments', assignmentId);
+    await setDoc(assignmentDocRef, {
+      assignmentId,
+      lastSessionAt: serverTimestamp(),
+    }, { merge: true });
+
     setCurrentSession({ id: sessionId, ...sessionData });
-    setMessages([]);
+    setMessagesSync([]);
     setEffectivePrompt(effective);
     setDesignDoc('');
     await loadSessions();
@@ -137,8 +154,8 @@ export function useSession(user, assignmentId) {
 
   const appendMessage = async (message) => {
     const ref = sessionDocRef.current;
-    const updated = [...messages, message];
-    setMessages(updated);
+    const updated = [...messagesRef.current, message];
+    setMessagesSync(updated);
 
     await updateDoc(ref, {
       messages: updated,

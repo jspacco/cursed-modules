@@ -45,19 +45,32 @@ export default function Landing({ user, loading, isProfessor, signIn, signOut, v
   const loadContent = async () => {
     setContentLoading(true);
     try {
-      const [csSnap, assignSnap, studentCsSnap, studentAssignSnap] = await Promise.all([
+      const [csSnap, assignSnap, studentCsSnap] = await Promise.all([
         getDocs(query(collection(db, 'casestudies'), where('active', '==', true), orderBy('order', 'asc'))).catch(() => ({ docs: [] })),
-        getDocs(query(collection(db, 'd4-assignments'), where('active', '==', true), orderBy('order', 'asc'))).catch(() => ({ docs: [] })),
+        getDocs(query(collection(db, 'd4-assignments'), where('active', '==', true))).catch(() => ({ docs: [] })),
         getDocs(collection(db, 'students', user.email, 'casestudies')).catch(() => ({ docs: [] })),
-        getDocs(collection(db, 'students', user.email, 'assignments')).catch(() => ({ docs: [] })),
       ]);
 
       const csProgress = {};
       studentCsSnap.docs.forEach((d) => { csProgress[d.id] = d.data(); });
-      const assignProgress = {};
-      studentAssignSnap.docs.forEach((d) => { assignProgress[d.id] = d.data(); });
-      setStudentData({ casestudies: csProgress, assignments: assignProgress });
 
+      // Check each assignment's sessions subcollection directly.
+      // The parent assignments document may not exist (Firestore subcollections
+      // don't auto-create parent docs), so we query sessions for each assignment.
+      const assignmentIds = assignSnap.docs.map((d) => d.id);
+      const sessionChecks = await Promise.all(
+        assignmentIds.map((id) =>
+          getDocs(collection(db, 'students', user.email, 'assignments', id, 'sessions'))
+            .then((snap) => ({ id, hasSessions: !snap.empty }))
+            .catch(() => ({ id, hasSessions: false }))
+        )
+      );
+      const assignProgress = {};
+      sessionChecks.forEach(({ id, hasSessions }) => {
+        if (hasSessions) assignProgress[id] = true;
+      });
+
+      setStudentData({ casestudies: csProgress, assignments: assignProgress });
       setCaseStudies(csSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
       setAssignments(assignSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
     } catch (err) {
@@ -117,6 +130,89 @@ export default function Landing({ user, loading, isProfessor, signIn, signOut, v
           <p>Continue your work below, or start something new.</p>
         </div>
 
+        {/* D4 Assignments */}
+        <section className="landing-section">
+          <div className="landing-section-header">
+            <h2>D4 Assignments</h2>
+            <span className="section-desc">Design Doc Driven Development with Klaus</span>
+          </div>
+
+          {contentLoading ? (
+            <div className="loading-center">
+              <div className="spinner" />
+            </div>
+          ) : assignments.length === 0 ? (
+            <div className="empty-state">
+              No assignments available yet. Check back soon.
+            </div>
+          ) : (
+            <div className="card-grid">
+              {assignments.map((assign) => {
+                const hasProgress = hasAssignProgress(assign.id);
+                return (
+                  <div key={assign.id} className="activity-card">
+                    <div className="card-header">
+                      <div className="card-title">{assign.title}</div>
+                    </div>
+
+                    {assign.subtitle && (
+                      <div className="card-subtitle">{assign.subtitle}</div>
+                    )}
+
+                    <div className="card-meta">
+                      {assign.prereqs && (
+                        <span className="badge badge-muted">{assign.prereqs}</span>
+                      )}
+                      {assign.estimatedMinutes && (
+                        <span className="card-time">
+                          ⏱ {formatTime(assign.estimatedMinutes)}
+                        </span>
+                      )}
+                    </div>
+
+                    {assign.description && (
+                      <div className="card-description">{assign.description}</div>
+                    )}
+
+                    {assign.mentorName && (
+                      <div className="card-tutor">
+                        with {assign.mentorName}
+                        {assign.mentorRole ? ` — ${assign.mentorRole}` : ''}
+                      </div>
+                    )}
+
+                    <div className="card-footer">
+                      {hasProgress ? (
+                        <>
+                          <button
+                            className="card-btn card-btn-begin"
+                            onClick={() => navigate(`/assignment/${assign.id}`, { state: { autoNew: true } })}
+                          >
+                            New Session
+                          </button>
+                          <button
+                            className="card-btn card-btn-resume"
+                            onClick={() => navigate(`/assignment/${assign.id}`)}
+                          >
+                            Continue
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          className="card-btn card-btn-begin"
+                          onClick={() => navigate(`/assignment/${assign.id}`)}
+                        >
+                          Begin
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
         {/* Case Studies */}
         <section className="landing-section">
           <div className="landing-section-header">
@@ -175,72 +271,6 @@ export default function Landing({ user, loading, isProfessor, signIn, signOut, v
                         onClick={() => navigate(`/case/${cs.id}`)}
                       >
                         {completed ? 'Review' : hasProgress ? 'Resume' : 'Begin'}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
-
-        {/* D4 Assignments */}
-        <section className="landing-section">
-          <div className="landing-section-header">
-            <h2>D4 Assignments</h2>
-            <span className="section-desc">Design Doc Driven Development with Klaus</span>
-          </div>
-
-          {contentLoading ? (
-            <div className="loading-center">
-              <div className="spinner" />
-            </div>
-          ) : assignments.length === 0 ? (
-            <div className="empty-state">
-              No assignments available yet. Check back soon.
-            </div>
-          ) : (
-            <div className="card-grid">
-              {assignments.map((assign) => {
-                const hasProgress = hasAssignProgress(assign.id);
-                return (
-                  <div key={assign.id} className="activity-card">
-                    <div className="card-header">
-                      <div className="card-title">{assign.title}</div>
-                    </div>
-
-                    {assign.subtitle && (
-                      <div className="card-subtitle">{assign.subtitle}</div>
-                    )}
-
-                    <div className="card-meta">
-                      {assign.prereqs && (
-                        <span className="badge badge-muted">{assign.prereqs}</span>
-                      )}
-                      {assign.estimatedMinutes && (
-                        <span className="card-time">
-                          ⏱ {formatTime(assign.estimatedMinutes)}
-                        </span>
-                      )}
-                    </div>
-
-                    {assign.description && (
-                      <div className="card-description">{assign.description}</div>
-                    )}
-
-                    {assign.mentorName && (
-                      <div className="card-tutor">
-                        with {assign.mentorName}
-                        {assign.mentorRole ? ` — ${assign.mentorRole}` : ''}
-                      </div>
-                    )}
-
-                    <div className="card-footer">
-                      <button
-                        className={`card-btn ${hasProgress ? 'card-btn-resume' : 'card-btn-begin'}`}
-                        onClick={() => navigate(`/assignment/${assign.id}`)}
-                      >
-                        {hasProgress ? 'View Sessions' : 'Begin'}
                       </button>
                     </div>
                   </div>
