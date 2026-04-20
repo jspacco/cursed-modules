@@ -107,6 +107,7 @@ export default function Assignment({ user, isProfessor, signOut, viewMode, setVi
   const handleNewSession = async () => {
     setIsThinking(true);
     setError(null);
+    let effective;
     try {
       // Load base prompt
       const baseRef = doc(db, 'config', 'd4-base');
@@ -127,7 +128,7 @@ export default function Assignment({ user, isProfessor, signOut, viewMode, setVi
       const includedDocs = allDocs.filter((d) => d.includeInPrompt === true);
 
       // Start session (assembles + snapshots effective prompt)
-      const effective = await startNewSession(
+      effective = await startNewSession(
         basePrompt,
         assignmentPrompt,
         includedDocs,

@@ -2,6 +2,12 @@
 
 Changes made after the v2 rebuild that are not yet reflected in `design.md`.
 
+## 2026-04-20 — Fix: effective out of scope in handleNewSession second try block
+**Files modified:** src/pages/Assignment.jsx
+**Problem:** `effective` was declared with `const` inside the first try block, making it inaccessible in the separate second try block that calls `callChatAPI`.
+**Fix/Change:** Declared `let effective` before both try blocks; removed `const` from the assignment inside the first try.
+**design.md note:** `handleNewSession` declares `effective` before its two try blocks so both can access it.
+
 ## 2026-04-20 — Fix: stale closure in handleNewSession opening callChatAPI
 **Files modified:** src/pages/Assignment.jsx
 **Problem:** `callChatAPI([openingMsg], effectivePrompt)` used `effectivePrompt` from destructured hook state, which is stale at the time of the call. The session's actual effective prompt was already returned by `startNewSession` as `effective`.
