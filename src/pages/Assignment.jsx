@@ -147,7 +147,7 @@ export default function Assignment({ user, isProfessor, signOut, viewMode, setVi
     // Send opening trigger — isolated so a failure here doesn't kill the session.
     try {
       const openingMsg = { role: 'user', content: "I'm ready to start the design exercise." };
-      const reply = await callChatAPI([openingMsg], effectivePrompt);
+      const reply = await callChatAPI([openingMsg], effective);
       if (reply) {
         await appendMessage({
           role: 'assistant',
