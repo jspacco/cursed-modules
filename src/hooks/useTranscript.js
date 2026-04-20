@@ -35,6 +35,16 @@ export function useTranscript(user, caseStudyId) {
     const promptContent = caseStudy.content || '';
     const now = new Date().toISOString();
 
+    // Ensure a top-level /students/{email} document exists so the instructor
+    // dashboard's getDocs(collection(db, 'students')) can enumerate all students
+    // (including the professor if they use the app in student mode).
+    // Firestore does not auto-create parent documents for subcollections.
+    const studentDocRef = doc(db, 'students', user.email);
+    await setDoc(studentDocRef, {
+      email: user.email,
+      name: user.displayName || '',
+    }, { merge: true });
+
     await setDoc(ref, {
       metadata: {
         studentName: user.displayName || '',

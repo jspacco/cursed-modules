@@ -144,6 +144,15 @@ export function useSession(user, assignmentId) {
       lastSessionAt: serverTimestamp(),
     }, { merge: true });
 
+    // Ensure a top-level /students/{email} document exists so the instructor
+    // dashboard's getDocs(collection(db, 'students')) can enumerate all students
+    // (including the professor if they use the app in student mode).
+    const studentDocRef = doc(db, 'students', user.email);
+    await setDoc(studentDocRef, {
+      email: user.email,
+      name: user.displayName || '',
+    }, { merge: true });
+
     setCurrentSession({ id: sessionId, ...sessionData });
     setMessagesSync([]);
     setEffectivePrompt(effective);

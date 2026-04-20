@@ -8,6 +8,13 @@ Changes made after the v2 rebuild that are not yet reflected in `design.md`.
 **Fix/Change:** Raised max_tokens to 5000.
 **design.md note:** The edge function uses max_tokens: 5000.
 
+## 2026-04-20 — Write top-level student doc so instructor dashboard can list all students
+
+**Files modified:** src/hooks/useTranscript.js, src/hooks/useSession.js
+**Problem:** The instructor dashboard's Students view queries `getDocs(collection(db, 'students'))` which only returns top-level `/students/{email}` documents. Neither `initSession` (case studies) nor `startNewSession` (D4 assignments) ever wrote a document at that path — only at subcollection paths. Firestore does not auto-create parent documents for subcollections, so no students (including the professor using the app in student mode) appeared in the list. There was no email-based exclusion in the query itself.
+**Fix/Change:** Added a `setDoc(..., { merge: true })` at `doc(db, 'students', user.email)` in both `initSession` and `startNewSession`. This ensures a top-level stub exists for every user who starts any activity, including the professor.
+**design.md note:** `initSession` and `startNewSession` both write a stub document at `/students/{email}` (merge) so the instructor dashboard student listing works for all users.
+
 ## 2026-04-20 — Add markdown rendering to assistant chat messages
 **Files modified:** src/components/MessageBubble.jsx, package.json
 **Problem:** Assistant messages containing markdown (e.g. `**Technical Specs**`) were displayed as raw text — asterisks and all — instead of rendered formatting.
