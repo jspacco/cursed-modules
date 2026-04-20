@@ -1,11 +1,9 @@
-# Cursed Modules — Complete Rebuild Spec
-## For Claude Code
+# Cursed Modules — Design Document
+## Version 2.0
 
 ---
 
 ## OVERVIEW
-
-Build the Cursed Modules web application from scratch. This is a complete rewrite — do not attempt to modify or reference any previous codebase. The Firebase project and Vercel project already exist and will be reused, but all application code is new.
 
 Cursed Modules is an interactive learning platform for a systems architecture course at Knox College. It has two sections:
 
@@ -66,7 +64,15 @@ ANTHROPIC_API_KEY=your_key_here
 Same keys with placeholder values.
 
 ### Vercel dashboard
-All variables above must be set in Vercel environment settings. `ANTHROPIC_API_KEY` is server-only (no VITE_ prefix).
+All variables above must be set in Vercel environment settings before the build runs. `ANTHROPIC_API_KEY` is server-only (no VITE_ prefix). Redeploy after setting them.
+
+---
+
+## LOCAL DEVELOPMENT
+
+Use `vercel dev` (not `npm run dev`) for local development. `npm run dev` runs Vite only and does not serve the `api/` Vercel Functions. `vercel dev` starts Vite internally and also mounts the `api/` directory, so `/api/chat` is reachable at `localhost:3000/api/chat`.
+
+Do not set the `dev` npm script to `vercel dev` — this causes a recursive invocation error because Vercel's dev server invokes the `dev` script internally.
 
 ---
 
@@ -78,6 +84,8 @@ All variables above must be set in Vercel environment settings. `ANTHROPIC_API_K
 │   ├── main.jsx
 │   ├── App.jsx
 │   ├── firebase.js
+│   ├── context/
+│   │   └── DirtyContext.jsx
 │   ├── pages/
 │   │   ├── Landing.jsx
 │   │   ├── CaseStudy.jsx
@@ -104,6 +112,10 @@ All variables above must be set in Vercel environment settings. `ANTHROPIC_API_K
 │       └── dashboard.css
 ├── api/
 │   └── chat.js
+├── design/
+│   ├── README.md
+│   ├── design.md          ← this file (canonical spec)
+│   └── changes.md         ← append-only changelog
 ├── .env.example
 ├── .gitignore
 ├── vercel.json
@@ -116,6 +128,12 @@ There is no `src/data/config.js`. All content comes from Firestore.
 ---
 
 ## FIRESTORE DATA MODEL
+
+### Flat top-level collections
+
+Firestore path segments must alternate collection/document. Never use a collection name as a document ID to create pseudo-nesting — documents at odd-segment paths are invalid. All collections in this app are flat and top-level.
+
+---
 
 ### /professors/{email}/
 
@@ -135,82 +153,93 @@ There is no `src/data/config.js`. All content comes from Firestore.
 }
 ```
 
-This is the only document that must be seeded manually before first use. The instructor creates it in the Firebase console with their Knox email as the document ID and all permissions set to true. Everything else is created through the instructor dashboard UI.
-
-No UI for creating or editing professor records — manage directly in Firestore console.
+This is the only document that must be seeded manually before first use. The instructor creates it in the Firebase console with their Knox email as the document ID and all permissions set to true. Everything else is created through the instructor dashboard UI. There is no UI for creating or editing professor records.
 
 ---
 
-### /prompts/
+### /config/d4-base
 
-All prompt content and all assignment/case study metadata lives here.
+Single document. Holds the D4 base system prompt shared across all D4 assignments.
 
 ```
-d4-base/
-  {
-    content: string,
-    version: integer,         // start at 1, increment on every save
-    updatedAt: Timestamp,
-    updatedBy: string         // email of instructor who saved
-  }
+{
+  content: string,
+  version: integer,       // start at 1, increment on every save
+  updatedAt: Timestamp,
+  updatedBy: string       // email of instructor who saved
+}
+```
 
-d4-assignments/{assignmentId}/
-  {
-    // Metadata
-    title: string,
-    subtitle: string,
-    mentorName: string,       // default "Klaus"
-    mentorRole: string,       // default "Senior Software Architect"
-    prereqs: string,
-    estimatedMinutes: integer,
-    description: string,
-    active: boolean,          // false = hidden from landing page
-    order: integer,           // display order on landing page
+---
 
-    // Prompt
-    content: string,
-    version: integer,
-    updatedAt: Timestamp,
-    updatedBy: string
-  }
+### /d4-assignments/{assignmentId}/
 
-d4-assignments/{assignmentId}/docs/{docId}/
-  {
-    title: string,
-    content: string,
-    type: string,             // 'markdown' | 'plaintext'
-    includeInPrompt: boolean, // true = concatenated into effective prompt
-    order: integer,           // display order in sidebar panel
-    version: integer,
-    updatedAt: Timestamp,
-    updatedBy: string
-  }
+```
+{
+  // Metadata
+  title: string,
+  description: string,
+  active: boolean,        // false = hidden from landing page
+  order: integer,         // default 0; present on all documents
 
-casestudies/{caseStudyId}/
-  {
-    // Metadata
-    title: string,
-    subtitle: string,
-    tutorName: string,
-    tutorRole: string,
-    prereqs: string,
-    estimatedMinutes: integer,
-    active: boolean,
-    order: integer,
-    concepts: [
-      { id: string, label: string }
-    ],
-    primarySources: [
-      { label: string, url: string, description: string }
-    ],
-    quickPrompts: string[],
+  // Prompt
+  content: string,
+  version: integer,
+  updatedAt: Timestamp,
+  updatedBy: string
+}
+```
 
-    // Prompt
-    content: string,
-    version: integer,
-    updatedAt: Timestamp,
-    updatedBy: string
-  }
+The assignment editor exposes only: ID (read-only after creation), title, description, active flag, and system prompt. Mentor name/role, subtitle, prereqs, and estimated minutes are defined inside the prompt text and are not stored as separate fields.
+
+Do not use `orderBy('order', 'asc')` when querying `d4-assignments` unless every document in the collection is guaranteed to have an `order` field — Firestore silently excludes documents missing an `orderBy` field. Assignment documents written by `NewAssignmentForm` include `order: 0` as a default.
+
+---
+
+### /d4-assignments/{assignmentId}/docs/{docId}/
+
+```
+{
+  title: string,
+  content: string,
+  type: string,             // 'markdown' | 'plaintext'
+  includeInPrompt: boolean, // true = concatenated into effective prompt
+  order: integer,           // display order in right panel tabs
+  version: integer,
+  updatedAt: Timestamp,
+  updatedBy: string
+}
+```
+
+---
+
+### /casestudies/{caseStudyId}/
+
+```
+{
+  // Metadata
+  title: string,
+  subtitle: string,
+  tutorName: string,
+  tutorRole: string,
+  prereqs: string,
+  estimatedMinutes: integer,
+  active: boolean,
+  order: integer,
+  concepts: [
+    { id: string, label: string }
+  ],
+  primarySources: [
+    { label: string, url: string, description: string }
+  ],
+  quickPrompts: string[],
+
+  // Prompt
+  content: string,
+  version: integer,
+  updatedAt: Timestamp,
+  updatedBy: string
+}
 ```
 
 ---
@@ -218,9 +247,9 @@ casestudies/{caseStudyId}/
 ### Effective prompt assembly for D4 sessions
 
 At session start, load:
-1. `/prompts/d4-base/` → base prompt
-2. `/prompts/d4-assignments/{id}/` → assignment prompt
-3. `/prompts/d4-assignments/{id}/docs/` → all docs, ordered by `order` field
+1. `/config/d4-base` → base prompt
+2. `/d4-assignments/{id}/` → assignment prompt
+3. `/d4-assignments/{id}/docs/` → all docs, ordered by `order` field
 
 Assemble:
 ```
@@ -252,17 +281,32 @@ Store this assembled string as `prompts.effective` in the session document. This
       version: integer,
       savedAt: Timestamp
     },
-    effective: string         // same as casestudy.content, stored for consistency
+    effective: string
   },
   messages: [
     {
       role: "user" | "assistant",
       content: string,
-      timestamp: string       // ISO 8601
+      timestamp: string   // ISO 8601
     }
   ]
 }
 ```
+
+---
+
+### /students/{email}/assignments/{assignmentId}/
+
+Stub document written on every new session start. Ensures the parent document exists for progress detection.
+
+```
+{
+  assignmentId: string,
+  lastSessionAt: Timestamp
+}
+```
+
+Written with `setDoc(..., { merge: true })` so it does not overwrite existing data.
 
 ---
 
@@ -294,7 +338,7 @@ Store this assembled string as `prompts.effective` in the session document. This
     },
     includedDocs: [
       // ONLY docs where includeInPrompt === true at session start
-      // Reference-only docs are NOT snapshotted — always loaded fresh from Firestore
+      // Reference-only docs are NOT snapshotted
       {
         docId: string,
         title: string,
@@ -304,7 +348,7 @@ Store this assembled string as `prompts.effective` in the session document. This
         savedAt: Timestamp
       }
     ],
-    effective: string         // fully assembled and frozen at session start
+    effective: string   // fully assembled and frozen at session start
   },
   messages: [
     {
@@ -313,9 +357,17 @@ Store this assembled string as `prompts.effective` in the session document. This
       timestamp: string
     }
   ],
-  designDoc: string           // extracted when Klaus generates it, empty string until then
+  designDoc: string     // extracted when Klaus generates it, empty string until then
 }
 ```
+
+---
+
+### Student progress detection
+
+Do not check for assignment progress by querying the `students/{email}/assignments` collection for parent documents — the parent document may not exist even when sessions do, because Firestore subcollections don't create parent documents automatically.
+
+Query `students/{email}/assignments/{assignId}/sessions` directly instead. `startNewSession` also writes a stub parent document on every new session (see above), so both approaches work for sessions created after that fix.
 
 ---
 
@@ -347,20 +399,22 @@ Handle partial delimiters gracefully — if start delimiter appears but no end d
 Route: `/`
 
 On mount, load from Firestore:
-- All documents from `/prompts/casestudies/` where `active === true`, ordered by `order`
-- All documents from `/prompts/d4-assignments/` where `active === true`, ordered by `order`
+- All documents from `/casestudies/` where `active === true`, ordered by `order`
+- All documents from `/d4-assignments/` where `active === true` (no `orderBy` — see data model note)
 
-Show loading spinner while reads are in flight. Handle empty states gracefully (no assignments yet, no case studies yet).
+Use `Promise.all` for both reads. Show loading spinner while reads are in flight. Handle empty states gracefully.
 
 If not signed in: centered sign-in prompt with Google SSO button and Knox College branding.
 
-If signed in: greeting with student name. Two sections:
+If signed in: greeting with student name. Two sections in this order:
 
-**Case Studies**
-Grid of case study cards. Each card shows title, subtitle, tutor name and role, prereq badge, estimated time. Button shows "Begin" or "Resume" based on whether student has an existing transcript. Completed case studies show a checkmark.
+**D4 Assignments** (shown first)
+Grid of assignment cards. Each card shows title, description. When no sessions exist: single **Begin** button navigating to `/assignment/{id}`. When sessions exist: two buttons —
+- **New Session** — navigates to `/assignment/{id}` with React Router state `{ autoNew: true }`
+- **Continue** — navigates to `/assignment/{id}` normally (session list view)
 
-**D4 Assignments**
-Grid of assignment cards. Each card shows title, mentor name, description. Button shows "Begin" or "View Sessions" based on whether student has existing sessions.
+**Case Studies** (shown second)
+Grid of case study cards. Each card shows title, subtitle, tutor name and role, prereq badge, estimated time. Button shows "Begin" or "Resume" based on existing transcript. Completed case studies show a checkmark.
 
 If professor: "Student View / Instructor View" toggle in header.
 
@@ -370,7 +424,7 @@ If professor: "Student View / Instructor View" toggle in header.
 
 Route: `/case/:caseStudyId`
 
-On mount, load case study metadata and prompt from `/prompts/casestudies/{id}/`.
+On mount, load case study metadata and prompt from `/casestudies/{id}/`.
 
 Two-column layout: sidebar (280px) + chat area (flex 1).
 
@@ -389,9 +443,10 @@ Two-column layout: sidebar (280px) + chat area (flex 1).
 - Send on Enter, Shift+Enter for newline
 - Thinking indicator (animated dots) while API call in flight
 - Input disabled while waiting for response
+- **Auto-focus:** `ChatInput` focuses the textarea whenever `disabled` transitions to `false` — no manual click needed after a server response
 
 **On session start:**
-1. Load current prompt from `/prompts/casestudies/{id}/`
+1. Load current prompt from `/casestudies/{id}/`
 2. Snapshot prompt into session document, set `prompts.effective = content`
 3. Send opening message "I'm ready to start the case study." (not displayed to student)
 4. Display tutor's response as first visible message
@@ -407,53 +462,63 @@ Two-column layout: sidebar (280px) + chat area (flex 1).
 
 Route: `/assignment/:assignmentId`
 
-On mount, load assignment metadata from `/prompts/d4-assignments/{id}/` and all supporting docs from the docs subcollection.
+On mount, load assignment metadata from `/d4-assignments/{id}/` and all supporting docs from the docs subcollection.
+
+**Auto-start new session:** If the page receives `location.state.autoNew === true` on mount (set by the "New Session" button on the landing page), wait for assignment data and sessions to finish loading, then call `handleNewSession()` automatically. Use a `useRef` flag (`autoNewTriggered`) to ensure this fires at most once per navigation.
+
+---
 
 **Session list view** (shown first if student has existing sessions):
 - List of sessions with session number, start date, last active date, status (in progress / completed)
-- "Start New Session" button at top
+- "New Session" button at top
 - Click any session to open it
+
+---
 
 **Session chat view** (after selecting or creating a session):
 Three-column layout: sidebar (220px) + chat area (flex 1) + right panel (280px, collapsible on small screens).
 
 **Sidebar:**
 - Assignment title
-- Klaus name and role
 - Session number and start date
-- "Start New Session" button
-- Link back to session list
+- "← All Sessions" back link
+- No "New Session" button — new sessions are started from the session list or the landing page
 
 **Chat area:**
-Same pattern as case study chat. Opening message for new session: "I'm ready to start the design exercise." (not displayed).
+Same pattern as case study chat, including auto-focus behavior. Opening message for new session: "I'm ready to start the design exercise." (not displayed to student).
 
-**Right panel — two tabs:**
+**Right panel — three tabs in this order:**
 
-*Design Doc tab:*
-- Shows "No design document yet" placeholder until Klaus generates one
-- When `session.designDoc` is populated, renders markdown content
-- "Copy to clipboard" button
+1. **Description** — shows `assignment.title` as heading and `assignment.description` as body text. This is the default tab on session open and session start.
+2. **Supporting doc tabs** — one tab per supporting doc, ordered by `order` field. Tab label is doc `title`; fallback label is `'Other Docs'`. Content loaded fresh from Firestore on every session open (never from snapshot). Rendered read-only as markdown.
+3. **Design Doc** — renders `session.designDoc` as markdown. Shows "No design document yet." placeholder until Klaus generates one. "Copy to clipboard" button. The Design Doc tab button must set `activeTab` to the string `'design'`.
 
-*Supporting doc tabs (one per doc, ordered by `order` field):*
-- Tab label is the doc title
-- Loads fresh from Firestore on every session open (never from snapshot)
-- Renders markdown content read-only
-- Only shown if supporting docs exist for this assignment
+---
 
-**On new session start:**
-1. Load `/prompts/d4-base/`
-2. Load `/prompts/d4-assignments/{id}/`
-3. Load all docs from subcollection
-4. Assemble effective prompt (base + assignment + included docs)
-5. Snapshot base, assignment, includedDocs, and effective into session document
-6. Assign sessionNumber = count of existing sessions + 1
-7. Send opening message, display response
+**New session flow:**
+
+Session creation and the opening-message API call are in **separate try-catch blocks**:
+
+1. **First block:** call `startNewSession()`:
+   - Load `/config/d4-base`
+   - Load `/d4-assignments/{id}/`
+   - Load all docs from subcollection
+   - Assemble effective prompt (base + assignment + included docs)
+   - Snapshot base, assignment, includedDocs, and effective into session document
+   - Assign sessionNumber = count of existing sessions + 1
+   - Write stub parent document at `students/{email}/assignments/{assignmentId}`
+   - **Return the assembled effective prompt** so the caller does not depend on state propagation timing
+   - On failure: show "Failed to start session" error and return early
+
+2. **Second block:** call `callChatAPI([openingMsg], effectivePrompt)` using the value returned from `startNewSession`:
+   - On failure: log to console only — the session is already open, student can begin typing
 
 **On resume session:**
 1. Load session document
-2. Use `session.prompts.effective` for all API calls (never reload from /prompts/)
+2. Use `session.prompts.effective` for all API calls (never reload from source collections)
 3. Load supporting docs fresh from Firestore (not from snapshot)
 4. Render existing messages
+5. Set default tab to Description
 
 ---
 
@@ -463,18 +528,23 @@ Route: `/instructor`
 
 Only accessible to professors. On mount, check `/professors/{email}/` — redirect to `/` if not a professor.
 
-**Layout:** Left nav + main content area.
+**Layout:** Left nav (four items) + main content area.
 
-**Left nav:**
-- Students
-- System Prompts
+**Left nav items:**
+- **Students** (default)
+- **D4 Base**
+- **D4 Assignments**
+- **Case Studies**
+
+There is no "System Prompts" grouping. Each nav item dispatches directly to the corresponding content view. All nav clicks are wrapped in `guardedNavigate` to protect unsaved changes.
+
+`SystemPromptsView` receives the active tab as a prop (`activeTab`) rather than managing its own sub-tab state.
 
 ---
 
-#### Students view (default)
+#### Students view
 
-Table of all students who have any activity. Load by querying the `/students/` collection.
-Columns: name, email, last active, case studies started, D4 assignments started.
+Table of all students who have any activity. Columns: name, email, last active, case studies started, D4 assignments started.
 
 Click a student → student detail view:
 - Student name and email
@@ -488,79 +558,67 @@ Click a student → student detail view:
 
 ---
 
-#### System Prompts view
+#### D4 Base view
 
-Three subsections: D4 Base | D4 Assignments | Case Studies
-
----
-
-**D4 Base subsection:**
 - Version number, last updated, updated by shown above textarea
 - Large textarea with full prompt content
-- "Save" button — increments version, writes to Firestore with updatedAt and updatedBy
-- Warning: "Changes apply to new sessions only. Existing sessions use the prompt version active when they started."
+- "Save" button — increments version, writes to `/config/d4-base` with updatedAt and updatedBy
+- Warning: "Changes apply to new sessions only."
+- Uses `setDoc(ref, data, { merge: true })` — never `updateDoc()`
 
 ---
 
-**D4 Assignments subsection:**
+#### D4 Assignments view
 
-List of all assignments from Firestore, ordered by `order` field. Each row shows title, active status, version, last updated. "+ New Assignment" button at top.
+List of all assignments from Firestore. Each row shows title, active status, version, last updated. "+ New Assignment" button at top.
 
 Click an assignment → assignment editor:
 
-*Metadata fields (all in one form, saved together with the prompt):*
+**Assignment editor fields:**
 ```
-Assignment ID     [text input — shown at top, read-only after creation, URL-safe slug]
+Assignment ID     [text — read-only after creation, shown at top]
 Title             [text input]
-Subtitle          [text input]
-Mentor Name       [text input, default "Klaus"]
-Mentor Role       [text input, default "Senior Software Architect"]
-Prereqs           [text input]
-Estimated Minutes [number input]
 Description       [textarea, 3-4 lines]
-Display Order     [number input]
 Active            [checkbox — unchecked hides from landing page]
 ```
 
-*Assignment System Prompt:*
+Mentor name/role, subtitle, prereqs, and estimated minutes are not stored as separate fields — define them in the system prompt text.
+
+**Assignment System Prompt:**
 - Version and last updated shown above
 - Large textarea
-- "Save Assignment" button — saves metadata + prompt in single Firestore write, increments prompt version
+- "Save Assignment" button — saves metadata + prompt content in a single Firestore write, increments prompt version
+- Uses `setDoc(ref, data, { merge: true })` — never `updateDoc()`
 - Warning: "Changes apply to new sessions only."
 
-*Supporting Documents:*
-List of supporting docs. Each row (collapsed state) shows:
-- Title
-- Type badge (markdown / plaintext)
-- "Include in prompt" checkbox with label
-- Version and last updated
-- Expand/collapse chevron
+**Supporting Documents:**
+List of supporting docs. Each row (collapsed) shows: title, type badge, "Include in prompt" checkbox, version, last updated, expand/collapse chevron.
 
-Expanded state reveals:
-- Title field (editable)
-- Type selector
-- Large textarea for content
-- "Save Document" button — increments that doc's version only, does not affect assignment version
+Expanded state: title field, type selector, large content textarea, "Save Document" button.
 
-"+ Add Supporting Document" button at bottom of list. Creates new doc with blank title, blank content, type: markdown, includeInPrompt: false, order: max existing + 1.
+"Save Document" increments that doc's version only — does not affect the parent assignment's version. Uses `setDoc(ref, data, { merge: true })`.
+
+"+ Add Supporting Document" creates a new doc with blank title, blank content, type: markdown, includeInPrompt: false, order: max existing + 1.
 
 No delete button — remove docs in Firestore console.
 
-*New Assignment workflow:*
-"+ New Assignment" opens creation form (same fields, all blank).
-- Assignment ID slug: validate URL-safe (lowercase, hyphens, no spaces), validate does not already exist
+**New Assignment workflow:**
+Form collects: ID (permanent slug), title, description, display order (written as `order: 0` if not set), active flag, and system prompt content. Mentor name/role are defined in the prompt text. Prereqs and estimated minutes are omitted.
+
+- Validate ID is URL-safe (lowercase, hyphens only, no spaces)
+- Validate ID does not already exist
 - Warn clearly that assignment ID is permanent and cannot be changed
 - On save: write to Firestore with version 1, redirect to assignment editor
 
 ---
 
-**Case Studies subsection:**
+#### Case Studies view
 
 Same list + editor pattern as D4 Assignments.
 
 Case study editor metadata fields:
 ```
-Case Study ID     [text input — read-only after creation]
+Case Study ID     [text — read-only after creation]
 Title             [text input]
 Subtitle          [text input]
 Tutor Name        [text input]
@@ -571,20 +629,102 @@ Display Order     [number input]
 Active            [checkbox]
 ```
 
-*Concepts list:*
-Ordered list of concept tracker entries. Each has ID and label fields. Add/remove/reorder entries. Order determines sidebar display order in the chat UI.
+**Concepts list:** Ordered list. Each entry has ID and label fields. Add/remove/reorder. Order determines sidebar display order in the chat UI.
 
-*Primary Sources list:*
-Ordered list. Each entry has label, URL, description. Add/remove entries.
+**Primary Sources list:** Ordered list. Each entry has label, URL, description. Add/remove.
 
-*Quick Prompts list:*
-List of prompt strings shown as buttons in the chat UI. Add/remove entries.
+**Quick Prompts list:** List of prompt strings shown as buttons in the chat UI. Add/remove.
 
-*Case Study System Prompt:*
-Large textarea with "Save" button. Same version behavior.
+**Case Study System Prompt:** Large textarea with "Save" button. Same version behavior and `setDoc({ merge: true })` requirement.
 
-*New Case Study workflow:*
-Same as new assignment — form with all fields, ID is permanent slug, redirect to editor on save.
+**New Case Study workflow:**
+Form collects only: ID, title, display order, active flag, and system prompt content. Subtitle, tutor name/role, prereqs, and estimated minutes are omitted from creation — fill in via the case study editor after creation.
+
+- ID validation same as assignment (URL-safe slug, permanent)
+- On save: write to Firestore with version 1, redirect to editor
+
+---
+
+## DIRTY BUFFER GUARD
+
+Any navigation action that would discard unsaved changes in an instructor editor must pass through `guardedNavigate()` from `DirtyContext`.
+
+### Architecture
+
+**`src/context/DirtyContext.jsx`** exports:
+- `DirtyProvider` — wrap the app with this in `App.jsx`
+- `useDirty()` — returns `{ setDirty, guardedNavigate }`
+
+```javascript
+// Editors call on any field change:
+setDirty(true, handleSave)   // registers dirty state + save callback
+
+// Editors call after successful save or on unmount:
+setDirty(false)
+
+// Navigation points call instead of navigating directly:
+guardedNavigate(() => { /* the navigation action */ })
+```
+
+`setDirty` stores the dirty flag and save callback in **refs** (not state) to avoid re-renders on every keystroke. The save callback is updated on every change so it always closes over the latest field values.
+
+Each editor uses a `fieldsRef` / `formRef` pattern: state drives the UI, the ref stays in sync, and `handleSave` reads from the ref. This avoids stale closure bugs when the modal's Save button invokes the callback.
+
+### Modal behavior
+
+When `guardedNavigate` is called with a pending dirty buffer, show a modal with three choices:
+- **Save** — runs the editor's save function, then proceeds with navigation
+- **Discard** — discards changes and navigates immediately
+- **Cancel** — closes the modal, stays on current view
+
+`DirtyProvider` renders the modal at the app root.
+
+### Navigation points that use guardedNavigate
+
+| Location | Trigger |
+|---|---|
+| `Header.jsx` | Student View ↔ Instructor View toggle |
+| `InstructorDashboard` main | Left nav items (Students, D4 Base, D4 Assignments, Case Studies) |
+| `AssignmentEditor` | ← Back button |
+| `CaseStudyEditor` | ← Back button |
+
+### Editors that register dirty state
+
+| Editor | Fields tracked |
+|---|---|
+| `InlinePromptEditor` | `content` (via `contentRef`) |
+| `DocEditor` | `title`, `content`, `type`, `includeInPrompt` (via `fieldsRef`) |
+| `AssignmentEditor` | All metadata fields + prompt content (via `formRef`) |
+| `CaseStudyEditor` | All metadata fields + `concepts`, `primarySources`, `quickPrompts`, prompt content (via separate refs) |
+
+### CSS classes (in global.css)
+
+```
+.dirty-overlay        — full-screen semi-transparent backdrop
+.dirty-modal          — centered card
+.dirty-modal-title    — modal heading
+.dirty-modal-body     — explanatory text
+.dirty-modal-actions  — flex row for Save / Discard / Cancel buttons
+```
+
+---
+
+## SESSION HOOKS
+
+### useSession.js
+
+Maintains a `messagesRef` in sync with `messages` state. All functions that append or replace messages must use `setMessagesSync` (which updates both the ref and the state) and must read from `messagesRef.current` — never from the `messages` state variable directly. This prevents stale-closure bugs when multiple async appends fire before a re-render.
+
+```javascript
+const messagesRef = useRef([]);
+
+const setMessagesSync = (msgs) => {
+  messagesRef.current = msgs;
+  setMessages(msgs);
+};
+```
+
+`startNewSession` returns the assembled effective prompt string so the caller can pass it directly to the opening-message API call without waiting for state propagation.
 
 ---
 
@@ -616,13 +756,18 @@ export default async function handler(req) {
   });
 
   const data = await response.json();
+
+  // Forward Anthropic's HTTP status — always returning 200 masks API errors
   return new Response(JSON.stringify(data), {
+    status: response.status,
     headers: { 'Content-Type': 'application/json' }
   });
 }
 ```
 
 The client sends `{ messages, systemPrompt }`. The systemPrompt is always `session.prompts.effective` — already assembled, already snapshotted. The Edge Function does no prompt assembly.
+
+The frontend must throw on non-OK responses: `if (!res.ok) throw new Error(...)`.
 
 ---
 
@@ -639,12 +784,113 @@ The client sends `{ messages, systemPrompt }`. The systemPrompt is always `sessi
 - Stored in React state — resets on page reload
 - Professors default to student view
 - Toggle in header: "Student View / Instructor View"
+- Clicking "Student View" calls `guardedNavigate` → `setViewMode('student'); navigate('/')`
+- Clicking "Instructor View" calls `guardedNavigate` → `setViewMode('instructor'); navigate('/instructor')`
+
+---
+
+## FIRESTORE RULES
+
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /professors/{email} {
+      allow read: if request.auth != null
+        && request.auth.token.email == email;
+      allow write: if false;
+    }
+
+    match /config/{document} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && exists(/databases/$(database)/documents/professors/$(request.auth.token.email));
+    }
+
+    match /d4-assignments/{document=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && exists(/databases/$(database)/documents/professors/$(request.auth.token.email));
+    }
+
+    match /casestudies/{document=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && exists(/databases/$(database)/documents/professors/$(request.auth.token.email));
+    }
+
+    match /students/{studentEmail}/{document=**} {
+      allow read, write: if request.auth != null
+        && request.auth.token.email == studentEmail;
+      allow read: if request.auth != null
+        && exists(/databases/$(database)/documents/professors/$(request.auth.token.email));
+    }
+  }
+}
+```
+
+Note: The `/config/{document}` rule replaces the old `/prompts/{document=**}` rule. The `{document=**}` wildcard on `d4-assignments` and `casestudies` covers their subcollections.
+
+---
+
+## VISUAL DESIGN
+
+### Color palette
+```css
+:root {
+  --bg: #f5f0e8;
+  --surface: #ede8de;
+  --surface2: #e0d9cc;
+  --border: #c8bfaa;
+  --accent: #8b2500;
+  --accent2: #c45a00;
+  --text: #1a1208;
+  --text-dim: #6b5e48;
+  --text-dimmer: #9c8e78;
+  --code-bg: #1a1208;
+  --code-text: #d4cfc8;
+
+  /* D4 — cooler tone to distinguish from Case Studies */
+  --d4-accent: #1a3a5c;
+  --d4-accent2: #2a5a8c;
+}
+```
+
+### Typography
+- Google Fonts: Bebas Neue, IBM Plex Mono, Source Serif 4
+- Headers: Bebas Neue
+- Body and chat messages: Source Serif 4, weight 300
+- Labels, code, metadata: IBM Plex Mono
+
+### Header
+- App name: "Cursed Modules" in Bebas Neue
+- Nav: Case Studies | D4
+- Right: student name, sign out
+- If professor: "Student View / Instructor View" toggle
+
+### Landing page cards
+- Case study cards: warm red accent (`--accent`)
+- D4 assignment cards: dark blue accent (`--d4-accent`)
+
+### Card footer buttons
+- `.card-footer`: `display: flex; gap: 8px`
+- `.card-btn`: `flex: 1` (fills full width when solo; shares row equally when two buttons present)
+
+### Instructor dashboard
+- Neutral, data-focused, IBM Plex Mono heavy
+
+### Responsive
+- Below 768px: sidebar hidden, single column
+- Right panel collapses to icon on small screens
 
 ---
 
 ## BOOTSTRAPPING
 
-The only manual step required before first use is creating the professor document in the Firebase console:
+The only manual step required before first use:
+
+**Create professor document in Firebase console:**
 
 Document path: `/professors/jspacco@knox.edu`
 ```json
@@ -666,13 +912,17 @@ Document path: `/professors/jspacco@knox.edu`
 After that, everything else is created through the instructor dashboard:
 
 1. Log in with Knox Google account → get instructor toggle
-2. Instructor View → System Prompts → D4 Base → paste prompt → Save
+2. Instructor View → D4 Base → paste prompt → Save
 3. D4 Assignments → New Assignment → fill form for DrawShapes → Save
 4. Add supporting docs to DrawShapes through the UI
 5. Case Studies → New Case Study → fill form for Java Date/Time → paste Ray's prompt → Save
 6. Landing page now shows both cards to students
 
-No Firestore console interaction required after step 1.
+---
+
+## INSTRUCTOR DASHBOARD SAVE RULES
+
+All save operations in the instructor dashboard use `setDoc(ref, data, { merge: true })` rather than `updateDoc()`. This ensures saves succeed even when the target document does not yet exist (e.g., the d4-base prompt on a fresh project). Never use `updateDoc()` for instructor dashboard writes.
 
 ---
 
@@ -900,7 +1150,6 @@ Write your response here and I'll give you feedback before you submit."
 ---
 
 ### Java Date/Time Case Study Metadata
-(Enter these fields in the case study editor form)
 
 ```
 Case Study ID:      java-datetime
@@ -958,12 +1207,10 @@ Quick Prompts:
 ---
 
 ### DrawShapes Assignment Metadata
-(Enter these fields in the assignment editor form)
 
 ```
 Assignment ID:      drawshapes
 Title:              DrawShapes
-Subtitle:           Design a Java Swing application for drawing and managing shapes
 Mentor Name:        Klaus
 Mentor Role:        Senior Software Architect
 Prereqs:            CS2: Data Structures
@@ -973,85 +1220,6 @@ Display Order:      1
 Description:        Negotiate a complete design document for a desktop drawing
                     application. Your document must be precise enough for a CLI
                     tool to implement without asking follow-up questions.
-```
-
----
-
-## VISUAL DESIGN
-
-### Color palette
-```css
-:root {
-  --bg: #f5f0e8;
-  --surface: #ede8de;
-  --surface2: #e0d9cc;
-  --border: #c8bfaa;
-  --accent: #8b2500;
-  --accent2: #c45a00;
-  --text: #1a1208;
-  --text-dim: #6b5e48;
-  --text-dimmer: #9c8e78;
-  --code-bg: #1a1208;
-  --code-text: #d4cfc8;
-
-  /* D4 — cooler tone to distinguish from Case Studies */
-  --d4-accent: #1a3a5c;
-  --d4-accent2: #2a5a8c;
-}
-```
-
-### Typography
-- Google Fonts: Bebas Neue, IBM Plex Mono, Source Serif 4
-- Headers: Bebas Neue
-- Body and chat messages: Source Serif 4, weight 300
-- Labels, code, metadata: IBM Plex Mono
-
-### Header
-- App name: "Cursed Modules" in Bebas Neue
-- Nav: Case Studies | D4
-- Right: student name, sign out
-- If professor: "Student View / Instructor View" toggle
-
-### Landing page cards
-- Case study cards: warm red accent (`--accent`)
-- D4 assignment cards: dark blue accent (`--d4-accent`)
-
-### Instructor dashboard
-- Neutral, data-focused, IBM Plex Mono heavy
-
-### Responsive
-- Below 768px: sidebar hidden, single column
-- Right panel collapses to icon on small screens
-
----
-
-## FIRESTORE SECURITY RULES
-
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-
-    match /professors/{email} {
-      allow read: if request.auth != null
-        && request.auth.token.email == email;
-      allow write: if false;
-    }
-
-    match /prompts/{document=**} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null
-        && exists(/databases/$(database)/documents/professors/$(request.auth.token.email));
-    }
-
-    match /students/{studentEmail}/{document=**} {
-      allow read, write: if request.auth != null
-        && request.auth.token.email == studentEmail;
-      allow read: if request.auth != null
-        && exists(/databases/$(database)/documents/professors/$(request.auth.token.email));
-    }
-  }
-}
 ```
 
 ---
@@ -1101,42 +1269,31 @@ dist/
 
 ---
 
-## BUILD AND DEPLOY
-
-Local development:
-```bash
-npm install
-vercel dev
-```
-
-Deploy:
-```bash
-vercel deploy --prod
-```
-
-Adding a new case study or assignment: use the instructor dashboard. No code changes, no GitHub push required.
-
----
-
 ## NOTES FOR CLAUDE CODE
 
 - There is no config.js. Do not create it. All content and metadata comes from Firestore at runtime.
-- The landing page makes two Firestore collection reads on mount. Show a loading spinner until both complete. Handle empty collections gracefully — the instructor may not have created any content yet.
-- The instructor dashboard is where all content is created. Build it fully — it is not an afterthought.
-- Build and test Firebase connection and auth before building any UI.
-- Build the Edge Function and test with a hardcoded message before connecting the chat UI.
-- Build the instructor dashboard last — it is the most complex piece.
-- All prompts come from Firestore at runtime. Never hardcode any prompt text in application code.
-- The `effective` field in session documents is the single source of truth for what gets sent to the API. Always use it. Never reconstruct the prompt from parts at call time.
-- When resuming a D4 session, use `session.prompts.effective` for API calls but load supporting docs fresh from Firestore (not from the snapshot).
-- Supporting docs with `includeInPrompt: false` are never snapshotted. Supporting docs with `includeInPrompt: true` are snapshotted in `prompts.includedDocs` at session start.
-- Design doc extraction must handle partial delimiters — if start delimiter appears but no end delimiter, do nothing and wait for the next message.
-- The `active` field on assignments and case studies controls landing page visibility. Inactive items are still editable in the dashboard.
-- The assignment ID slug entered during new assignment creation becomes the Firestore document ID permanently. Validate it is URL-safe (lowercase, hyphens only, no spaces) before saving. Warn clearly that it cannot be changed.
-- The professor toggle must be invisible to non-professors — do not render it at all, not just disable it.
-- Saving an individual supporting doc increments that doc's version only — it does not affect the parent assignment's version.
-- Saving an assignment saves metadata and prompt content together in a single Firestore write.
-- The Firestore security rules use `{document=**}` wildcard to cover subcollections — verify this covers `/prompts/d4-assignments/{id}/docs/{docId}`.
-- Error states matter throughout: handle missing prompt documents, Firebase errors, API errors, and auth errors with user-facing messages.
+- Use `vercel dev` for local development, not `npm run dev`. Vite alone does not serve `/api/` functions.
+- All instructor dashboard saves use `setDoc(ref, data, { merge: true })`. Never use `updateDoc()`.
+- The landing page makes two Firestore reads on mount with `Promise.all`. Show a loading spinner until both complete. Handle empty collections gracefully.
+- The instructor dashboard has four left nav items: Students, D4 Base, D4 Assignments, Case Studies. No "System Prompts" grouping.
+- All nav clicks in the instructor dashboard go through `guardedNavigate` from `DirtyContext`.
+- The D4 base prompt lives at `/config/d4-base`, not under `/prompts/`. D4 assignments are at `/d4-assignments/{id}`. Case studies are at `/casestudies/{id}`. All flat top-level collections.
+- Do not query `d4-assignments` with `orderBy('order')` unless guaranteed all documents have that field. Firestore silently excludes documents missing the ordered field.
+- Check for assignment progress by querying the sessions subcollection directly — do not rely on the parent assignment document existing.
+- `startNewSession` must return the assembled effective prompt string so the opening message call does not depend on state propagation timing.
+- Session creation and the opening message API call are in separate try-catch blocks. Opening message failure is console-only — the session is already open.
+- `useSession` must use a `messagesRef` kept in sync with state via `setMessagesSync`. Never read from the `messages` state variable in async append functions — always read from `messagesRef.current`.
+- The edge function must forward `status: response.status` from the Anthropic response. The frontend must throw on non-OK responses.
+- `ChatInput` auto-focuses the textarea when `disabled` transitions to `false`.
+- The right panel default tab is always Description, not Design Doc.
+- The Design Doc tab button must set `activeTab` to the string `'design'`.
+- Supporting doc tab labels fall back to `'Other Docs'` if title is absent.
+- The assignment editor does not have a "New Session" button in the sidebar — only in the session list and on the landing page.
+- The professor toggle must be invisible to non-professors — do not render it at all.
+- Supporting docs with `includeInPrompt: false` are never snapshotted. Those with `includeInPrompt: true` are snapshotted in `prompts.includedDocs`. When resuming, always load supporting docs fresh from Firestore regardless of snapshot.
+- Saving a supporting doc increments that doc's version only — it does not affect the parent assignment's version.
+- Design doc extraction must handle partial delimiters — if start delimiter appears but no end delimiter, do nothing and wait.
+- The `active` field controls landing page visibility. Inactive items remain editable in the dashboard.
+- The assignment ID slug is permanent and becomes the Firestore document ID. Validate URL-safe before saving. Warn clearly that it cannot be changed.
+- Error states matter: handle missing prompt documents, Firebase errors, API errors, and auth errors with user-facing messages.
 - Console.log full Firestore reads during development to catch data model issues early.
-```
