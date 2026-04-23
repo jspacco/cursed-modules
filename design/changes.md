@@ -2,6 +2,12 @@
 
 Changes made after the v2 rebuild that are not yet reflected in `design.md`.
 
+## 2026-04-22 — Switch Claude model from Sonnet to Haiku
+**Files modified:** api/chat.js
+**Problem:** Backend was using `claude-sonnet-4-20250514` which is more expensive.
+**Fix/Change:** Changed model to `claude-haiku-4-5-20251001`.
+**design.md note:** The edge function uses `claude-haiku-4-5-20251001`.
+
 ## 2026-04-20 — Fix: effective out of scope in handleNewSession second try block
 **Files modified:** src/pages/Assignment.jsx
 **Problem:** `effective` was declared with `const` inside the first try block, making it inaccessible in the separate second try block that calls `callChatAPI`.
