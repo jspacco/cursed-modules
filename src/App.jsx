@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from './firebase';
 import { useAuth } from './hooks/useAuth';
 import { DirtyProvider } from './context/DirtyContext';
 import Landing from './pages/Landing';
@@ -11,8 +13,20 @@ export default function App() {
   const { user, loading, isProfessor, permissions, signIn, signOut } = useAuth();
   // Professors default to student view; resets on reload
   const [viewMode, setViewMode] = useState('student');
+  const [model, setModel] = useState('haiku');
 
-  const sharedProps = { user, isProfessor, signOut, permissions, viewMode, setViewMode };
+  // Load model setting from Firestore once on mount
+  useEffect(() => {
+    getDoc(doc(db, 'config', 'settings'))
+      .then((snap) => {
+        if (snap.exists() && snap.data().model) {
+          setModel(snap.data().model);
+        }
+      })
+      .catch(() => {}); // silently fall back to haiku
+  }, []);
+
+  const sharedProps = { user, isProfessor, signOut, permissions, viewMode, setViewMode, model, setModel };
 
   return (
     <DirtyProvider>

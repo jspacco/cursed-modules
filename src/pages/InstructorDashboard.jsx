@@ -1247,8 +1247,97 @@ function SystemPromptsView({ userEmail, activeTab }) {
   );
 }
 
+// ─── Settings View ────────────────────────────────────────────────────────────
+function SettingsView({ userEmail, model, setModel }) {
+  const [selected, setSelected] = useState(model || 'haiku');
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  // Keep local selection in sync if parent model changes
+  useEffect(() => { setSelected(model || 'haiku'); }, [model]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await setDoc(doc(db, 'config', 'settings'), {
+        model: selected,
+        updatedAt: serverTimestamp(),
+        updatedBy: userEmail,
+      }, { merge: true });
+      setModel(selected);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      alert('Save failed: ' + err.message);
+    }
+    setSaving(false);
+  };
+
+  return (
+    <div>
+      <div className="dashboard-section-header">
+        <h2>Settings</h2>
+      </div>
+
+      <div className="editor-form" style={{ maxWidth: '480px' }}>
+        <h3>AI Model</h3>
+        <p style={{ fontSize: '13px', color: 'var(--text-dim)', marginBottom: '20px', lineHeight: 1.6 }}>
+          Choose which model powers student chat sessions. Changes apply to all new messages immediately.
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer', padding: '14px 16px', border: `2px solid ${selected === 'haiku' ? 'var(--accent)' : 'var(--border)'}`, borderRadius: '6px', background: selected === 'haiku' ? 'var(--surface)' : 'transparent' }}>
+            <input
+              type="radio"
+              name="model"
+              value="haiku"
+              checked={selected === 'haiku'}
+              onChange={() => setSelected('haiku')}
+              style={{ marginTop: '2px', accentColor: 'var(--accent)' }}
+            />
+            <div>
+              <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>
+                Claude Haiku (Anthropic)
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '2px' }}>
+                claude-haiku-4-5 — fast, low cost
+              </div>
+            </div>
+          </label>
+
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer', padding: '14px 16px', border: `2px solid ${selected === 'gemini-flash' ? 'var(--accent)' : 'var(--border)'}`, borderRadius: '6px', background: selected === 'gemini-flash' ? 'var(--surface)' : 'transparent' }}>
+            <input
+              type="radio"
+              name="model"
+              value="gemini-flash"
+              checked={selected === 'gemini-flash'}
+              onChange={() => setSelected('gemini-flash')}
+              style={{ marginTop: '2px', accentColor: 'var(--accent)' }}
+            />
+            <div>
+              <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>
+                Gemini 2.0 Flash (Google)
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '2px' }}>
+                gemini-2.0-flash — fast, low cost
+              </div>
+            </div>
+          </label>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving...' : 'Save Setting'}
+          </button>
+          {saved && <span style={{ color: 'var(--success)', fontSize: '13px' }}>✓ Saved</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
-export default function InstructorDashboard({ user, isProfessor, signOut, permissions, viewMode, setViewMode }) {
+export default function InstructorDashboard({ user, isProfessor, signOut, permissions, viewMode, setViewMode, model, setModel }) {
   const navigate = useNavigate();
   const [navTab, setNavTab] = useState('students');
   const { guardedNavigate } = useDirty();
@@ -1298,12 +1387,21 @@ export default function InstructorDashboard({ user, isProfessor, signOut, permis
           >
             Case Studies
           </button>
+          <button
+            className={`dashboard-nav-item${navTab === 'settings' ? ' active' : ''}`}
+            onClick={() => guardedNavigate(() => setNavTab('settings'))}
+          >
+            Settings
+          </button>
         </nav>
 
         <main className="dashboard-main">
           {navTab === 'students' && <StudentsView userEmail={user?.email} />}
           {(navTab === 'd4base' || navTab === 'd4assignments' || navTab === 'casestudies') && (
             <SystemPromptsView userEmail={user?.email} activeTab={navTab} />
+          )}
+          {navTab === 'settings' && (
+            <SettingsView userEmail={user?.email} model={model} setModel={setModel} />
           )}
         </main>
       </div>

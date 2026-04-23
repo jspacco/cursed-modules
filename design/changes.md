@@ -2,6 +2,12 @@
 
 Changes made after the v2 rebuild that are not yet reflected in `design.md`.
 
+## 2026-04-22 — Add instructor model settings (Haiku vs Gemini Flash)
+**Files modified:** api/chat.js, src/App.jsx, src/pages/CaseStudy.jsx, src/pages/Assignment.jsx, src/pages/InstructorDashboard.jsx
+**Problem:** Model was hardcoded. Instructor needed a way to switch between Anthropic Haiku and Gemini 2.0 Flash without a code deploy.
+**Fix/Change:** Added `/config/settings` Firestore document storing `{ model: 'haiku' | 'gemini-flash' }`. App.jsx loads it on mount and passes `model` as a shared prop. Both page callChatAPI functions forward `model` in the request body. The edge function routes to Anthropic or Gemini accordingly, normalizing Gemini's response to Anthropic's shape so the frontend is unchanged. InstructorDashboard gains a Settings nav item with a radio-button SettingsView that writes to Firestore and updates app state immediately.
+**design.md note:** `/config/settings` stores `{ model }`. The edge function accepts `model` in the request body and routes to Anthropic Haiku or Gemini 2.0 Flash. The instructor dashboard Settings view (new nav item) reads and writes this setting.
+
 ## 2026-04-22 — Switch Claude model from Sonnet to Haiku
 **Files modified:** api/chat.js
 **Problem:** Backend was using `claude-sonnet-4-20250514` which is more expensive.

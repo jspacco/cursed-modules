@@ -26,18 +26,18 @@ function computeCoveredConcepts(concepts, messages) {
   return covered;
 }
 
-async function callChatAPI(messages, systemPrompt) {
+async function callChatAPI(messages, systemPrompt, model) {
   const res = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages, systemPrompt }),
+    body: JSON.stringify({ messages, systemPrompt, model }),
   });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   const data = await res.json();
   return data.content?.[0]?.text || '';
 }
 
-export default function CaseStudy({ user, isProfessor, signOut, viewMode, setViewMode }) {
+export default function CaseStudy({ user, isProfessor, signOut, viewMode, setViewMode, model }) {
   const { caseStudyId } = useParams();
   const navigate = useNavigate();
 
@@ -100,7 +100,7 @@ export default function CaseStudy({ user, isProfessor, signOut, viewMode, setVie
       const openingMsg = { role: 'user', content: "I'm ready to start the case study." };
       const apiMessages = [openingMsg];
 
-      const reply = await callChatAPI(apiMessages, prompt);
+      const reply = await callChatAPI(apiMessages, prompt, model);
 
       // 3. Save only the assistant reply (opening message not displayed)
       const assistantMsg = {
@@ -137,7 +137,7 @@ export default function CaseStudy({ user, isProfessor, signOut, viewMode, setVie
       // Build API messages from current messages + new user message
       const apiMessages = [...messages, userMsg].map(({ role, content }) => ({ role, content }));
 
-      const reply = await callChatAPI(apiMessages, effectivePrompt);
+      const reply = await callChatAPI(apiMessages, effectivePrompt, model);
 
       const assistantMsg = {
         role: 'assistant',

@@ -10,18 +10,18 @@ import SessionList from '../components/SessionList';
 import DesignDocPanel from '../components/DesignDocPanel';
 import '../styles/assignment.css';
 
-async function callChatAPI(messages, systemPrompt) {
+async function callChatAPI(messages, systemPrompt, model) {
   const res = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages, systemPrompt }),
+    body: JSON.stringify({ messages, systemPrompt, model }),
   });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   const data = await res.json();
   return data.content?.[0]?.text || '';
 }
 
-export default function Assignment({ user, isProfessor, signOut, viewMode, setViewMode }) {
+export default function Assignment({ user, isProfessor, signOut, viewMode, setViewMode, model }) {
   const { assignmentId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -148,7 +148,7 @@ export default function Assignment({ user, isProfessor, signOut, viewMode, setVi
     // Send opening trigger — isolated so a failure here doesn't kill the session.
     try {
       const openingMsg = { role: 'user', content: "I'm ready to start the design exercise." };
-      const reply = await callChatAPI([openingMsg], effective);
+      const reply = await callChatAPI([openingMsg], effective, model);
       if (reply) {
         await appendMessage({
           role: 'assistant',
@@ -180,7 +180,7 @@ export default function Assignment({ user, isProfessor, signOut, viewMode, setVi
 
     try {
       const apiMessages = [...messages, userMsg].map(({ role, content }) => ({ role, content }));
-      const reply = await callChatAPI(apiMessages, effectivePrompt);
+      const reply = await callChatAPI(apiMessages, effectivePrompt, model);
 
       const assistantMsg = {
         role: 'assistant',
