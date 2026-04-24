@@ -2,6 +2,12 @@
 
 Changes made after the v2 rebuild that are not yet reflected in `design.md`.
 
+## 2026-04-24 — Fix Gemini model name and add API key check
+**Files modified:** api/chat.js, .env.example
+**Problem:** `api/chat.js` was using a non-existent `gemini-2.5-flash` model and lacked a check for `GEMINI_API_KEY`.
+**Fix/Change:** Updated model to `gemini-2.0-flash` in `api/chat.js` and added a check to ensure `GEMINI_API_KEY` is set before making requests. Added `GEMINI_API_KEY` placeholder to `.env.example`.
+**design.md note:** The edge function uses `gemini-2.0-flash` for Gemini requests and requires `GEMINI_API_KEY` to be set.
+
 ## 2026-04-22 — Add instructor model settings (Haiku vs Gemini Flash)
 **Files modified:** api/chat.js, src/App.jsx, src/pages/CaseStudy.jsx, src/pages/Assignment.jsx, src/pages/InstructorDashboard.jsx
 **Problem:** Model was hardcoded. Instructor needed a way to switch between Anthropic Haiku and Gemini 2.0 Flash without a code deploy.

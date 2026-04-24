@@ -36,6 +36,13 @@ async function handleAnthropic(messages, systemPrompt) {
 }
 
 async function handleGemini(messages, systemPrompt) {
+  if (!process.env.GEMINI_API_KEY) {
+    return new Response(JSON.stringify({ error: { message: 'GEMINI_API_KEY is not set' } }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   // Convert Anthropic message format to Gemini format
   const contents = messages.map((m) => ({
     role: m.role === 'assistant' ? 'model' : 'user',
